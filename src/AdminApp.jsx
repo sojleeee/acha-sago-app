@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDeleteReport } from "./firebase";
+import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDeleteReport, registerForPush } from "./firebase";
 import {
   ClipboardList, Trophy, Camera, MapPin, User,
   Trash2, X, Loader2, Award, Medal, Sprout, ImageOff,
@@ -64,6 +64,7 @@ export default function AdminApp() {
       setLastLoaded(new Date());
       setLoading(false);
     });
+    registerForPush();
     return () => unsubscribe();
   }, [authed]);
 

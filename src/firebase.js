@@ -6,10 +6,12 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  setDoc,
   onSnapshot,
   query,
   orderBy,
 } from "firebase/firestore";
+import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB3gvkt1Xi3DLGnK9IK8s3b4eLXSIstxnk",
@@ -20,8 +22,47 @@ const firebaseConfig = {
   appId: "1:843342964801:web:ddc17feba7faa65044bec0",
 };
 
+const VAPID_KEY = "BG6MdqoALB9ha1F200gE-yIdF0vaMU1I0tQsY4wfn8NIv_Y9xTYGxrn2gu-fO7Snx1PRVi1iXlIA64iDJ4NFGVw";
+
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+// ── 푸시 알림(FCM) ──────────────────────────────────
+export async function registerForPush() {
+  try {
+    const supported = await isSupported();
+    if (!supported) return null;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return null;
+
+    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+
+    if (token) {
+      await setDoc(doc(db, "adminTokens", token), {
+        token,
+        updatedAt: new Date().toISOString(),
+      });
+      onMessage(messaging, (payload) => {
+        // 앱이 켜져있을 때(포그라운드) 온 알림도 표시
+        const title = payload.notification?.title || "아차사고 발굴";
+        const body = payload.notification?.body || "새 신고가 접수되었습니다.";
+        if (Notification.permission === "granted") {
+          new Notification(title, { body, icon: "/icon-192.png" });
+        }
+      });
+    }
+    return token;
+  } catch (e) {
+    console.error("푸시 알림 등록 실패", e);
+    return null;
+  }
+}
 
 const reportsCol = collection(db, "reports");
 

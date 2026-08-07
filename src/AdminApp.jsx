@@ -165,11 +165,13 @@ function ReportList({ reports, onDelete, onUpdate }) {
   ];
 
   const [hazardFilter, setHazardFilter] = useState("all");
-  let filtered = statusFilter === "all" ? reports : reports.filter((r) => r.status === statusFilter);
+  let filtered = statusFilter === "all"
+    ? reports
+    : reports.filter((r) => r.status === statusFilter || (statusFilter === "pending" && r.status === "action"));
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  const pendingCount  = reports.filter((r) => r.status === "pending").length;
+  const pendingCount  = reports.filter((r) => r.status === "pending" || r.status === "action").length;
   const deferredCount = reports.filter((r) => r.status === "deferred").length;
   const doneCount     = reports.filter((r) => r.status === "done").length;
 

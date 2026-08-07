@@ -153,42 +153,29 @@ export default function AdminApp() {
 
 /* ════════════════════════════ 신고 목록 ════════════════════════════ */
 function ReportList({ reports, onDelete, onUpdate }) {
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | undone | done
   const [photoView, setPhotoView]   = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
 
-  const STATUS_FILTERS = [
-    { id: "all",      label: "전체",     color: C.blue },
-    { id: "pending",  label: "대기",     color: C.yellow },
-    { id: "deferred", label: "조치 불가",color: C.red },
-    { id: "done",     label: "완료",     color: C.green },
-  ];
-
   const [hazardFilter, setHazardFilter] = useState("all");
-  let filtered = statusFilter === "all"
-    ? reports
-    : reports.filter((r) => r.status === statusFilter || (statusFilter === "pending" && r.status === "action"));
+  let filtered = reports;
+  if (statusFilter === "undone") filtered = reports.filter((r) => r.status !== "done");
+  if (statusFilter === "done") filtered = reports.filter((r) => r.status === "done");
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const pendingCount  = reports.filter((r) => r.status === "pending" || r.status === "action").length;
   const deferredCount = reports.filter((r) => r.status === "deferred").length;
   const doneCount     = reports.filter((r) => r.status === "done").length;
+  const undoneCount   = pendingCount + deferredCount;
 
   return (
     <div style={{ animation: "fadein .3s ease" }}>
-      {/* 요약 배지 */}
+      {/* 요약 배지 (클릭하면 필터로 동작) */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <StatBadge label="전체"   value={reports.length}              color={C.blue} />
-        <StatBadge label="미조치" value={pendingCount + deferredCount} color={C.red} />
-        <StatBadge label="조치완료" value={doneCount}                 color={C.green} />
-      </div>
-
-      {/* 상태 필터 */}
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 8 }}>
-        {STATUS_FILTERS.map((s) => (
-          <Chip key={s.id} active={statusFilter === s.id} onClick={() => setStatusFilter(s.id)} label={s.label} color={s.color} />
-        ))}
+        <StatBadge label="전체" value={reports.length} color={C.blue} active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+        <StatBadge label="미조치" value={undoneCount} color={C.red} active={statusFilter === "undone"} onClick={() => setStatusFilter("undone")} />
+        <StatBadge label="조치완료" value={doneCount} color={C.green} active={statusFilter === "done"} onClick={() => setStatusFilter("done")} />
       </div>
 
       {/* 위험유형 필터 */}
@@ -281,12 +268,18 @@ function ReportList({ reports, onDelete, onUpdate }) {
   );
 }
 
-function StatBadge({ label, value, color }) {
+function StatBadge({ label, value, color, active, onClick }) {
   return (
-    <div style={{ flex: 1, background: C.surface, borderRadius: 10, padding: "10px 12px", textAlign: "center", border: `1px solid ${C.line}` }}>
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1, background: active ? `${color}22` : C.surface, borderRadius: 10, padding: "10px 12px",
+        textAlign: "center", border: `1.5px solid ${active ? color : C.line}`, cursor: "pointer",
+      }}
+    >
       <div className="mono" style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{label}</div>
-    </div>
+      <div style={{ fontSize: 11, color: active ? color : C.muted, marginTop: 2, fontWeight: active ? 700 : 400 }}>{label}</div>
+    </button>
   );
 }
 

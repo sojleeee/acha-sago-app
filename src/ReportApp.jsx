@@ -305,7 +305,7 @@ function StepAction({ onDone, onBack }) {
             {photoBusy ? "처리 중…" : "조치 후 사진 찍기"}
           </button>
         )}
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: "none" }} />
+        <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
       </div>
 
       <div>
@@ -500,7 +500,7 @@ function ReportForm({ onSubmit }) {
             {photoBusy ? "처리 중…" : "사진 선택하기"}
           </button>
         )}
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: "none" }} />
+        <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
       </Field>
 
       <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"

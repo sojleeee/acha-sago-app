@@ -152,6 +152,11 @@ export default function ReportApp() {
     setFlow({ reportId: report.id, step: "action" });
   };
 
+  const handleRemovePending = (id) => {
+    removePendingId(id);
+    setPendingReports((prev) => prev.filter((p) => p.id !== id));
+  };
+
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter', sans-serif" }}>
       <style>{`
@@ -197,7 +202,7 @@ export default function ReportApp() {
           ) : (
             <>
               {!pendingLoading && pendingReports.length > 0 && (
-                <PendingActions reports={pendingReports} onResume={handleResume} />
+                <PendingActions reports={pendingReports} onResume={handleResume} onRemove={handleRemovePending} />
               )}
               <ReportForm onSubmit={addReport} />
             </>
@@ -220,7 +225,9 @@ export default function ReportApp() {
 
 /* ════════════════════════════ 조치 플로우 ════════════════════════════ */
 /* ════════════════════════════ 미완료 조치 이어하기 ════════════════════════════ */
-function PendingActions({ reports, onResume }) {
+function PendingActions({ reports, onResume, onRemove }) {
+  const [confirmId, setConfirmId] = useState(null);
+
   return (
     <div style={{ background: `${C.orange}14`, border: `1.5px solid ${C.orange}55`, borderRadius: 14, padding: 14, marginBottom: 18, animation: "fadein .3s ease" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -229,18 +236,37 @@ function PendingActions({ reports, onResume }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {reports.map((r) => (
-          <button
-            key={r.id}
-            onClick={() => onResume(r)}
-            style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
-              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
+          <div key={r.id} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 8px 10px 12px" }}>
+              <button
+                onClick={() => onResume(r)}
+                style={{ display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", textAlign: "left", flex: 1, minWidth: 0, padding: 0 }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
+                </div>
+                <span style={{ fontSize: 12, color: C.orange, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
+                <ChevronRight size={16} color={C.orange} style={{ flexShrink: 0 }} />
+              </button>
+              <button
+                onClick={() => setConfirmId(r.id)}
+                style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 6, flexShrink: 0 }}
+                aria-label="목록에서 지우기"
+              >
+                <X size={15} />
+              </button>
             </div>
-            <span style={{ fontSize: 12, color: C.orange, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
-            <ChevronRight size={16} color={C.orange} style={{ flexShrink: 0 }} />
-          </button>
+            {confirmId === r.id && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderTop: `1px solid ${C.line}`, background: C.surfaceAlt }}>
+                <span style={{ fontSize: 12, color: C.muted }}>목록에서 지울까요? (신고 기록은 남아요)</span>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => setConfirmId(null)} style={{ fontSize: 12, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>취소</button>
+                  <button onClick={() => { onRemove(r.id); setConfirmId(null); }} style={{ fontSize: 12, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>지우기</button>
+                </div>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>

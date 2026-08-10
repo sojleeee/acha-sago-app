@@ -94,12 +94,14 @@ export default function ReportApp() {
     (async () => {
       const ids = loadPendingIds();
       if (ids.length === 0) { setPendingLoading(false); return; }
-      const results = await Promise.all(ids.map((id) => getReport(id).catch(() => null)));
+      const ERROR = Symbol("error");
+      const results = await Promise.all(ids.map((id) => getReport(id).catch(() => ERROR)));
       const stillPending = [];
       for (let i = 0; i < ids.length; i++) {
         const r = results[i];
+        if (r === ERROR) continue; // 일시적 오류: 다음에 다시 시도하도록 목록에 그대로 둠
         if (r && r.status === "action") stillPending.push(r);
-        else removePendingId(ids[i]); // 완료됐거나 삭제된 신고는 목록에서 정리
+        else removePendingId(ids[i]); // 완료됐거나 실제로 삭제된 신고만 정리
       }
       setPendingReports(stillPending);
       setPendingLoading(false);

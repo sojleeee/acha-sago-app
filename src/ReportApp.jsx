@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport } from "./firebase";
+import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport } from "./firebase";
 import {
   AlertTriangle, Camera, MapPin, Clock, User,
   X, Loader2, Send, CheckCircle2, ChevronRight,
@@ -152,9 +152,10 @@ export default function ReportApp() {
     setFlow({ reportId: report.id, step: "action" });
   };
 
-  const handleRemovePending = (id) => {
-    removePendingId(id);
-    setPendingReports((prev) => prev.filter((p) => p.id !== id));
+  const handleRemoveAllPending = async (ids) => {
+    await Promise.all(ids.map((id) => fbDeleteReport(id).catch(() => {})));
+    ids.forEach(removePendingId);
+    setPendingReports((prev) => prev.filter((p) => !ids.includes(p.id)));
   };
 
   return (
@@ -202,7 +203,7 @@ export default function ReportApp() {
           ) : (
             <>
               {!pendingLoading && pendingReports.length > 0 && (
-                <PendingActions reports={pendingReports} onResume={handleResume} onRemove={handleRemovePending} />
+                <PendingActions reports={pendingReports} onResume={handleResume} onRemoveAll={handleRemoveAllPending} />
               )}
               <ReportForm onSubmit={addReport} />
             </>
@@ -225,50 +226,58 @@ export default function ReportApp() {
 
 /* ════════════════════════════ 조치 플로우 ════════════════════════════ */
 /* ════════════════════════════ 미완료 조치 이어하기 ════════════════════════════ */
-function PendingActions({ reports, onResume, onRemove }) {
-  const [confirmId, setConfirmId] = useState(null);
+function PendingActions({ reports, onResume, onRemoveAll }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
     <div style={{ background: `${C.orange}14`, border: `1.5px solid ${C.orange}55`, borderRadius: 14, padding: 14, marginBottom: 18, animation: "fadein .3s ease" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Wrench size={16} color={C.orange} />
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>완료하지 못한 조치가 있어요</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Wrench size={16} color={C.orange} />
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>완료하지 못한 조치가 있어요</span>
+        </div>
+        <button
+          onClick={() => setConfirmOpen(true)}
+          style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}
+          aria-label="목록 지우기"
+        >
+          <X size={16} />
+        </button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {reports.map((r) => (
-          <div key={r.id} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 8px 10px 12px" }}>
-              <button
-                onClick={() => onResume(r)}
-                style={{ display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", textAlign: "left", flex: 1, minWidth: 0, padding: 0 }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
-                </div>
-                <span style={{ fontSize: 12, color: C.orange, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
-                <ChevronRight size={16} color={C.orange} style={{ flexShrink: 0 }} />
-              </button>
-              <button
-                onClick={() => setConfirmId(r.id)}
-                style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 6, flexShrink: 0 }}
-                aria-label="목록에서 지우기"
-              >
-                <X size={15} />
-              </button>
+          <button
+            key={r.id}
+            onClick={() => onResume(r)}
+            style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
             </div>
-            {confirmId === r.id && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 12px", borderTop: `1px solid ${C.line}`, background: C.surfaceAlt }}>
-                <span style={{ fontSize: 12, color: C.muted }}>목록에서 지울까요? (신고 기록은 남아요)</span>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => setConfirmId(null)} style={{ fontSize: 12, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>취소</button>
-                  <button onClick={() => { onRemove(r.id); setConfirmId(null); }} style={{ fontSize: 12, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>지우기</button>
-                </div>
-              </div>
-            )}
-          </div>
+            <span style={{ fontSize: 12, color: C.orange, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
+            <ChevronRight size={16} color={C.orange} style={{ flexShrink: 0 }} />
+          </button>
         ))}
       </div>
+
+      {confirmOpen && (
+        <div onClick={() => setConfirmOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,14,20,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 24 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: C.surface, borderRadius: 16, padding: 24, width: "100%", maxWidth: 320, animation: "popin .2s ease" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>목록에서 지울까요?</div>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>이 신고 기록이 삭제됩니다.</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setConfirmOpen(false)} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>
+              <button
+                onClick={() => { onRemoveAll(reports.map((r) => r.id)); setConfirmOpen(false); }}
+                style={{ flex: 2, padding: "11px 0", background: C.red, border: "none", borderRadius: 10, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 }}
+              >
+                지우기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

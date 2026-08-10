@@ -14,6 +14,15 @@ const C = {
   green: "#4CAF7D", orange: "#E8974C",
 };
 
+const DEPT_LIST = [
+  "감사실", "안전환경실", "ESG전략실", "홍보비서실",
+  "기획조정처", "경영지원처",
+  "매립시설처", "매립운영처", "물환경처",
+  "자원사업처", "탄소사업처", "에너지사업처",
+  "지역상생처", "체육공원처",
+  "기술정보처", "연구분석처",
+];
+
 const HAZARD_TYPES = [
   { id: "slip",     label: "🚶 넘어짐·미끄러짐·걸림", color: C.yellow },
   { id: "fall",     label: "🏗️ 낙하·비래",            color: C.orange },
@@ -467,7 +476,12 @@ function ReportForm({ onSubmit }) {
       <Field label="4. 소속" error={errors.dept}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
           <ClipboardList size={15} color={C.muted} />
-          <input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="예: 안전환경실" style={iS} />
+          <select value={dept} onChange={(e) => setDept(e.target.value)} style={{ ...iS, appearance: "none", WebkitAppearance: "none", color: dept ? C.text : "#5C6B7E" }}>
+            <option value="" disabled>소속을 선택하세요</option>
+            {DEPT_LIST.map((d) => (
+              <option key={d} value={d} style={{ color: C.text, background: C.surface }}>{d}</option>
+            ))}
+          </select>
         </div>
       </Field>
 

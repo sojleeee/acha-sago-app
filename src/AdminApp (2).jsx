@@ -154,15 +154,15 @@ export default function AdminApp() {
 
 /* ════════════════════════════ 신고 목록 ════════════════════════════ */
 function ReportList({ reports, onDelete, onUpdate }) {
-  const [statusFilter, setStatusFilter] = useState("all"); // all | done | deferred | progress
+  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | progress | deferred | done
   const [photoView, setPhotoView]   = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
 
   const [hazardFilter, setHazardFilter] = useState("all");
   let filtered = reports;
-  if (statusFilter === "done") filtered = reports.filter((r) => r.status === "done");
-  if (statusFilter === "deferred") filtered = reports.filter((r) => r.status === "deferred");
   if (statusFilter === "progress") filtered = reports.filter((r) => r.status === "pending" || r.status === "action");
+  if (statusFilter === "deferred") filtered = reports.filter((r) => r.status === "deferred");
+  if (statusFilter === "done") filtered = reports.filter((r) => r.status === "done");
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -175,9 +175,9 @@ function ReportList({ reports, onDelete, onUpdate }) {
       {/* 요약 배지 (클릭하면 필터로 동작) */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         <StatBadge label="전체" value={reports.length} color={C.blue} active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
-        <StatBadge label="조치완료" value={doneCount} color={C.green} active={statusFilter === "done"} onClick={() => setStatusFilter("done")} />
-        <StatBadge label="즉시조치불가" value={deferredCount} color={C.red} active={statusFilter === "deferred"} onClick={() => setStatusFilter("deferred")} />
         <StatBadge label="조치진행중" value={progressCount} color={C.orange} active={statusFilter === "progress"} onClick={() => setStatusFilter("progress")} />
+        <StatBadge label="즉시조치불가" value={deferredCount} color={C.red} active={statusFilter === "deferred"} onClick={() => setStatusFilter("deferred")} />
+        <StatBadge label="조치완료" value={doneCount} color={C.green} active={statusFilter === "done"} onClick={() => setStatusFilter("done")} />
       </div>
 
       {/* 위험유형 필터 */}

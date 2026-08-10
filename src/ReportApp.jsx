@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { addReport as fbAddReport, updateReport as fbUpdateReport } from "./firebase";
+import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport } from "./firebase";
 import {
   AlertTriangle, Camera, MapPin, Clock, User,
   X, Loader2, Send, CheckCircle2, ChevronRight,
@@ -22,6 +22,22 @@ const DEPT_LIST = [
   "지역상생처", "체육공원처",
   "기술정보처", "연구분석처",
 ];
+
+// ── 미완료 조치 로컬 저장 (이 기기에서 "즉시 조치 가능" 선택했지만 아직 완료 안 한 신고) ──
+const PENDING_KEY = "acha-pending-actions";
+
+function loadPendingIds() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]"); }
+  catch { return []; }
+}
+function addPendingId(id) {
+  const ids = loadPendingIds();
+  if (!ids.includes(id)) localStorage.setItem(PENDING_KEY, JSON.stringify([...ids, id]));
+}
+function removePendingId(id) {
+  const ids = loadPendingIds().filter((x) => x !== id);
+  localStorage.setItem(PENDING_KEY, JSON.stringify(ids));
+}
 
 const HAZARD_TYPES = [
   { id: "slip",     label: "🚶 넘어짐·미끄러짐·걸림", color: C.yellow },
@@ -71,6 +87,24 @@ export default function ReportApp() {
   const [flow, setFlow] = useState(null);
   const [currentId, setCurrentId] = useState(null);
   const [currentReport, setCurrentReport] = useState(null);
+  const [pendingReports, setPendingReports] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const ids = loadPendingIds();
+      if (ids.length === 0) { setPendingLoading(false); return; }
+      const results = await Promise.all(ids.map((id) => getReport(id).catch(() => null)));
+      const stillPending = [];
+      for (let i = 0; i < ids.length; i++) {
+        const r = results[i];
+        if (r && r.status === "action") stillPending.push(r);
+        else removePendingId(ids[i]); // 완료됐거나 삭제된 신고는 목록에서 정리
+      }
+      setPendingReports(stillPending);
+      setPendingLoading(false);
+    })();
+  }, []);
 
   const addReport = async (r) => {
     const { id: tempId, ...data } = r;
@@ -88,6 +122,8 @@ export default function ReportApp() {
   const handleChoose = (choice) => {
     if (choice === "immediate") {
       updateReport(currentId, { status: "action" });
+      addPendingId(currentId);
+      setPendingReports((prev) => prev.some((p) => p.id === currentId) ? prev : [...prev, { ...currentReport, status: "action" }]);
       setFlow((f) => ({ ...f, step: "action" }));
     } else {
       setFlow((f) => ({ ...f, step: "confirmDefer" }));
@@ -96,6 +132,8 @@ export default function ReportApp() {
 
   const handleActionDone = async ({ actionDesc, actionPhoto }) => {
     await updateReport(currentId, { status: "done", actionDesc, actionPhoto: actionPhoto || null, actionAt: new Date().toISOString() });
+    removePendingId(currentId);
+    setPendingReports((prev) => prev.filter((p) => p.id !== currentId));
     setFlow((f) => ({ ...f, step: "done" }));
   };
 
@@ -105,6 +143,14 @@ export default function ReportApp() {
   };
 
   const handleFlowEnd = () => { setFlow(null); setCurrentId(null); setCurrentReport(null); };
+
+  const handleBackToChoose = () => setFlow((f) => ({ ...f, step: "choose" }));
+
+  const handleResume = (report) => {
+    setCurrentId(report.id);
+    setCurrentReport(report);
+    setFlow({ reportId: report.id, step: "action" });
+  };
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter', sans-serif" }}>
@@ -146,9 +192,15 @@ export default function ReportApp() {
               onActionDone={handleActionDone}
               onDeferred={handleDeferred}
               onEnd={handleFlowEnd}
+              onBackToChoose={handleBackToChoose}
             />
           ) : (
-            <ReportForm onSubmit={addReport} />
+            <>
+              {!pendingLoading && pendingReports.length > 0 && (
+                <PendingActions reports={pendingReports} onResume={handleResume} />
+              )}
+              <ReportForm onSubmit={addReport} />
+            </>
           )}
         </div>
 
@@ -167,7 +219,35 @@ export default function ReportApp() {
 }
 
 /* ════════════════════════════ 조치 플로우 ════════════════════════════ */
-function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd }) {
+/* ════════════════════════════ 미완료 조치 이어하기 ════════════════════════════ */
+function PendingActions({ reports, onResume }) {
+  return (
+    <div style={{ background: `${C.orange}14`, border: `1.5px solid ${C.orange}55`, borderRadius: 14, padding: 14, marginBottom: 18, animation: "fadein .3s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <Wrench size={16} color={C.orange} />
+        <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>완료하지 못한 조치가 있어요</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {reports.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => onResume(r)}
+            style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
+            </div>
+            <span style={{ fontSize: 12, color: C.orange, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
+            <ChevronRight size={16} color={C.orange} style={{ flexShrink: 0 }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, onBackToChoose }) {
   const steps = [
     { id: "choose",       label: "조치 선택" },
     { id: "action",       label: "조치 진행" },
@@ -209,8 +289,8 @@ function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd })
       )}
 
       {flow.step === "choose"      && <StepChoose onChoose={onChoose} onBack={onEnd} />}
-      {flow.step === "confirmDefer"&& <StepConfirmDefer onConfirm={onDeferred} onBack={() => onChoose("back")} />}
-      {flow.step === "action"      && <StepAction onDone={onActionDone} onBack={() => onChoose("back")} />}
+      {flow.step === "confirmDefer"&& <StepConfirmDefer onConfirm={onDeferred} onBack={onBackToChoose} />}
+      {flow.step === "action"      && <StepAction onDone={onActionDone} onBack={onBackToChoose} />}
       {flow.step === "done"        && <StepDone report={report} onEnd={onEnd} />}
       {flow.step === "deferred"    && <StepDeferred onEnd={onEnd} />}
     </div>

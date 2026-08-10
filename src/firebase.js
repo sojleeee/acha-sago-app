@@ -6,6 +6,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   setDoc,
   onSnapshot,
   query,
@@ -83,6 +84,11 @@ export async function addReport(report) {
 
 export async function updateReport(id, patch) {
   await updateDoc(doc(db, "reports", id), patch);
+}
+
+export async function getReport(id) {
+  const snap = await getDoc(doc(db, "reports", id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 export async function deleteReport(id) {

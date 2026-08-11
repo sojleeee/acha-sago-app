@@ -176,7 +176,7 @@ export default function ReportApp() {
             </div>
             <div>
               <div className="osw" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1 }}>아차사고 발굴</div>
-              <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>당신의 작은 개선이 큰 사고를 예방합니다.</div>
+              <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>작은 발견이 큰 사고를 막아요.</div>
             </div>
           </div>
         </div>
@@ -208,7 +208,7 @@ export default function ReportApp() {
           <div style={{ position: "sticky", bottom: 0, background: C.surface, borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "center", padding: "12px 0 18px" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: C.yellow }}>
               <AlertTriangle size={20} strokeWidth={2.4} />
-              <span style={{ fontSize: 11, fontWeight: 600 }}>신고하기</span>
+              <span style={{ fontSize: 11, fontWeight: 600 }}>발견하기</span>
             </div>
           </div>
         )}
@@ -258,7 +258,7 @@ function PendingActions({ reports, onResume, onRemoveAll }) {
         <div onClick={() => setConfirmOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,14,20,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 24 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: C.surface, borderRadius: 16, padding: 24, width: "100%", maxWidth: 320, animation: "popin .2s ease" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>목록에서 지울까요?</div>
-            <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>이 신고 기록이 삭제됩니다.</p>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>이 발견 기록이 삭제됩니다.</p>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setConfirmOpen(false)} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>
               <button
@@ -321,26 +321,26 @@ function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, o
 function StepChoose({ onChoose, onBack }) {
   return (
     <div style={{ animation: "popin .25s ease" }}>
-      <button onClick={onBack} style={{ background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← 신고로 돌아가기</button>
-      <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>즉시 조치가 가능한가요?</div>
+      <button onClick={onBack} style={{ background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← 발견으로 돌아가기</button>
+      <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>위험요소를 바로 조치할 수 있나요?</div>
       <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>현장에서 바로 위험 요소를 제거하거나 조치할 수 있는지 선택해주세요.</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <button onClick={() => onChoose("immediate")} style={{ display: "flex", alignItems: "center", gap: 14, background: `${C.green}18`, border: `1.5px solid ${C.green}`, borderRadius: 14, padding: "16px 18px", cursor: "pointer", textAlign: "left" }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.green}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Wrench size={22} color={C.green} />
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.green}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>
+            🔧
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.green }}>1. 즉시 조치 가능</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.green }}>바로 조치 가능해요</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>지금 바로 조치 후 결과를 기록합니다</div>
           </div>
           <ChevronRight size={18} color={C.green} style={{ marginLeft: "auto" }} />
         </button>
         <button onClick={() => onChoose("deferred")} style={{ display: "flex", alignItems: "center", gap: 14, background: `${C.red}18`, border: `1.5px solid ${C.red}`, borderRadius: 14, padding: "16px 18px", cursor: "pointer", textAlign: "left" }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.red}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Clock3 size={22} color={C.red} />
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.red}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>
+            ⏰
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.red }}>2. 즉시 조치 불가</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.red }}>조치가 필요해요</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>담당자에게 알림을 보냅니다</div>
           </div>
           <ChevronRight size={18} color={C.red} style={{ marginLeft: "auto" }} />
@@ -354,16 +354,16 @@ function StepChoose({ onChoose, onBack }) {
 function StepConfirmDefer({ onConfirm, onBack }) {
   return (
     <div style={{ animation: "popin .25s ease", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "10px 0", textAlign: "center" }}>
-      <div style={{ width: 60, height: 60, borderRadius: "50%", background: `${C.red}22`, border: `3px solid ${C.red}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Clock3 size={28} color={C.red} />
+      <div style={{ width: 60, height: 60, borderRadius: "50%", background: `${C.red}22`, border: `3px solid ${C.red}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
+        ❗
       </div>
       <div>
-        <div className="osw" style={{ fontSize: 18, fontWeight: 700, color: C.red }}>즉시 조치가 불가능한가요?</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>담당자에게 알림이 발송됩니다.<br />정말 전송하시겠습니까?</p>
+        <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>담당자에게 조치를 요청할까요?</div>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>등록한 위험요소가 담당자에게 전달됩니다.</p>
       </div>
       <div style={{ display: "flex", gap: 10, width: "100%" }}>
-        <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>취소</button>
-        <button onClick={onConfirm} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>전송</button>
+        <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
+        <button onClick={onConfirm} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
       </div>
     </div>
   );
@@ -389,8 +389,8 @@ function StepAction({ onDone, onBack }) {
 
   const handleSubmit = async () => {
     const e = {};
-    if (!actionDesc.trim()) e.desc = "조치 내용을 입력해주세요.";
-    if (!actionPhoto)       e.photo = "조치 후 사진을 첨부해주세요.";
+    if (!actionDesc.trim()) e.desc = "필수 작성입니다.";
+    if (!actionPhoto)       e.photo = "필수 작성입니다.";
     setErrors(e);
     if (Object.keys(e).length > 0) return;
     setSubmitting(true);
@@ -404,7 +404,7 @@ function StepAction({ onDone, onBack }) {
       <div className="osw" style={{ fontSize: 17, fontWeight: 700 }}>조치 내용을 기록해주세요</div>
 
       <div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 후 사진 (필수)</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 후 사진을 보여주세요</div>
         {actionPhoto ? (
           <div style={{ position: "relative", width: 130 }}>
             <img src={actionPhoto} alt="조치 사진" style={{ width: 130, height: 130, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
@@ -423,8 +423,8 @@ function StepAction({ onDone, onBack }) {
       </div>
 
       <div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 내용</div>
-        <textarea value={actionDesc} onChange={(e) => { setActionDesc(e.target.value); setErrors((p) => ({ ...p, desc: undefined })); }} placeholder={"어떤 조치를 취했는지 적어주세요.\n예: 미끄럼 방지 테이프 부착, 안전 표지판 설치 등"} rows={4}
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>어떤 조치를 취했는지 적어주세요</div>
+        <textarea value={actionDesc} onChange={(e) => { setActionDesc(e.target.value); setErrors((p) => ({ ...p, desc: undefined })); }} placeholder={"예: 미끄럼 방지 테이프 부착, 안전 표지판 설치 등"} rows={4}
           style={{ width: "100%", background: C.surface, border: `1px solid ${errors.desc ? C.red : C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
         {errors.desc && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{errors.desc}</div>}
       </div>
@@ -432,7 +432,7 @@ function StepAction({ onDone, onBack }) {
       <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"
         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
         {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <CircleCheck size={17} />}
-        조치 완료 등록
+        등록
       </button>
     </div>
   );
@@ -442,22 +442,15 @@ function StepAction({ onDone, onBack }) {
 function StepDone({ report, onEnd }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 72, height: 72, borderRadius: "50%", background: `${C.green}22`, border: `3px solid ${C.green}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <CheckCircle2 size={36} color={C.green} />
+      <div style={{ width: 90, height: 90, borderRadius: "50%", background: `${C.green}22`, border: `3px solid ${C.green}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        <img src="/icon-done.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
         <div className="osw" style={{ fontSize: 22, fontWeight: 700, color: C.green }}>조치 완료!</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>신고부터 조치까지 모두 기록되었습니다.<br />안전한 현장을 만들어주셔서 감사합니다.</p>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>안전한 현장을 만들어주셔서 감사합니다.</p>
       </div>
-      {report?.actionDesc && (
-        <div style={{ width: "100%", background: C.surface, borderRadius: 12, padding: 14, textAlign: "left", border: `1px solid ${C.line}` }}>
-          <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>등록된 조치 내용</div>
-          <p style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{report.actionDesc}</p>
-          {report.actionPhoto && <img src={report.actionPhoto} alt="조치 사진" style={{ width: "100%", borderRadius: 8, marginTop: 10, objectFit: "cover", maxHeight: 160 }} />}
-        </div>
-      )}
       <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
-        새 신고하기
+        새로 발견하기
       </button>
     </div>
   );
@@ -467,19 +460,19 @@ function StepDone({ report, onEnd }) {
 function StepDeferred({ onEnd }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 72, height: 72, borderRadius: "50%", background: `${C.red}22`, border: `3px solid ${C.red}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Clock3 size={36} color={C.red} />
+      <div style={{ width: 90, height: 90, borderRadius: "50%", background: `${C.red}22`, border: `3px solid ${C.red}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        <img src="/icon-undone.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
-        <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.red }}>담당자에게 알림을 보냈습니다</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>신고가 <span style={{ color: C.yellow, fontWeight: 600 }}>즉시 조치 불가</span>로 기록되었습니다.<br />담당자가 확인 후 조치 예정입니다.</p>
+        <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.red }}>조치를 요청했습니다!</div>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>안전한 작업환경을 만드는 데<br />함께해 주셔서 감사합니다.</p>
       </div>
       <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 12, padding: 14, textAlign: "left" }}>
         <div style={{ fontSize: 12.5, color: C.red, fontWeight: 600, marginBottom: 4 }}>⚠ 주의사항</div>
         <p style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>조치 전까지 해당 구역 접근을 제한하고,<br />주변 동료에게 위험 사실을 알려주세요.</p>
       </div>
       <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
-        새 신고하기
+        돌아가기
       </button>
     </div>
   );
@@ -511,13 +504,13 @@ function ReportForm({ onSubmit }) {
 
   const validate = () => {
     const e = {};
-    if (!occurredAt)           e.occurredAt = "발생 일시를 선택해주세요.";
-    if (!location.trim())      e.location   = "발생 장소를 입력해주세요.";
-    if (!dept.trim())          e.dept       = "소속을 입력해주세요.";
-    if (!name.trim())          e.name       = "이름을 입력해주세요.";
-    if (!desc.trim())          e.desc       = "상황을 설명해주세요.";
-    if (!photo)                e.photo      = "사진을 첨부해주세요.";
-    if (hazard === "etc" && !etcLabel.trim()) e.etcLabel = "위험 유형을 직접 입력해주세요.";
+    if (!occurredAt)           e.occurredAt = "필수 작성입니다.";
+    if (!location.trim())      e.location   = "필수 작성입니다.";
+    if (!dept.trim())          e.dept       = "필수 작성입니다.";
+    if (!name.trim())          e.name       = "필수 작성입니다.";
+    if (!desc.trim())          e.desc       = "필수 작성입니다.";
+    if (!photo)                e.photo      = "필수 작성입니다.";
+    if (hazard === "etc" && !etcLabel.trim()) e.etcLabel = "필수 작성입니다.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -561,16 +554,16 @@ function ReportForm({ onSubmit }) {
         )}
       </Field>
 
-      {/* 2. 발생 일시 */}
-      <Field label="2. 발생 일시" error={errors.occurredAt}>
+      {/* 2. 언제 발견했나요? */}
+      <Field label="2. 발견한 일시를 알려주세요" error={errors.occurredAt}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
           <Clock size={15} color={C.muted} />
           <input type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} style={iS} />
         </div>
       </Field>
 
-      {/* 3. 발생 장소 */}
-      <Field label="3. 발생 장소" error={errors.location}>
+      {/* 3. 어디서 봤나요? */}
+      <Field label="3. 발견된 장소를 알려주세요" error={errors.location}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
           <MapPin size={15} color={C.muted} />
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="예: 제3매립장 침출수 처리시설 앞" style={iS} />
@@ -578,7 +571,7 @@ function ReportForm({ onSubmit }) {
       </Field>
 
       {/* 4. 소속 */}
-      <Field label="4. 소속" error={errors.dept}>
+      <Field label="4. 소속을 알려주세요" error={errors.dept}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
           <ClipboardList size={15} color={C.muted} />
           <input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="예: 안전환경실" style={iS} />
@@ -586,21 +579,21 @@ function ReportForm({ onSubmit }) {
       </Field>
 
       {/* 5. 이름 */}
-      <Field label="5. 이름" error={errors.name}>
+      <Field label="5. 이름을 알려주세요" error={errors.name}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
           <User size={15} color={C.muted} />
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 홍길동" style={iS} />
         </div>
       </Field>
 
-      {/* 6. 상황 설명 */}
-      <Field label="6. 상황 설명" error={errors.desc}>
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="무슨 일이 있었는지, 왜 위험했는지 적어주세요." rows={4}
+      {/* 6. 어떤 위험이었나요? */}
+      <Field label="6. 어떤 상황이었나요?" error={errors.desc}>
+        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="어떤 점이 위험해 보였는지 알려주세요." rows={4}
           style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
       </Field>
 
       {/* 7. 사진 첨부 */}
-      <Field label="7. 사진 첨부 (필수)" error={errors.photo}>
+      <Field label="7. 사진을 보여주세요" error={errors.photo}>
         {photo ? (
           <div style={{ position: "relative", width: 120 }}>
             <img src={photo} alt="첨부" style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
@@ -620,7 +613,7 @@ function ReportForm({ onSubmit }) {
       <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"
         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting || photoBusy ? 0.7 : 1, marginTop: 4 }}>
         {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={16} />}
-        신고 접수하기
+        다음으로
       </button>
     </div>
   );

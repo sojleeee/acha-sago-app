@@ -11,6 +11,8 @@ import {
   onSnapshot,
   query,
   orderBy,
+  where,
+  getDocs,
 } from "firebase/firestore";
 import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
 
@@ -93,4 +95,16 @@ export async function getReport(id) {
 
 export async function deleteReport(id) {
   await deleteDoc(doc(db, "reports", id));
+}
+
+export async function getAllReports() {
+  const snap = await getDocs(query(reportsCol));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+// 이름으로 아직 완료 안 한 "즉시 조치 가능" 신고를 찾습니다 (다른 기기에서 이어하기용)
+export async function findActionReportsByName(name) {
+  const q = query(reportsCol, where("reporterName", "==", name), where("status", "==", "action"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

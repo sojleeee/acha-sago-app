@@ -70,11 +70,14 @@ export default function AdminApp() {
     return () => unsubscribe();
   }, [authed]);
 
-  const deleteReport = (id) => fbDeleteReport(id);
+  const deleteReport = (id) => fbUpdateReport(id, { deleted: true, deletedAt: new Date().toISOString() });
+  const restoreReport = (id) => fbUpdateReport(id, { deleted: false, deletedAt: null });
+  const permanentlyDelete = (id) => fbDeleteReport(id);
   const updateReport = (id, patch) => fbUpdateReport(id, patch);
   const load = () => setLastLoaded(new Date());
 
-  const newCount = reports.filter((r) => r.status === "pending" || r.status === "deferred").length;
+  const newCount = reports.filter((r) => !r.deleted && (r.status === "pending" || r.status === "deferred")).length;
+  const trashCount = reports.filter((r) => r.deleted).length;
 
   if (!authed) return <PinScreen onSuccess={() => setAuthed(true)} />;
 
@@ -128,8 +131,10 @@ export default function AdminApp() {
               <span style={{ fontSize: 13 }}>불러오는 중…</span>
             </div>
           ) : tab === "list"
-            ? <ReportList reports={reports} onDelete={deleteReport} onUpdate={updateReport} />
-            : <Ranking reports={reports} />
+            ? <ReportList reports={reports.filter((r) => !r.deleted)} onDelete={deleteReport} onUpdate={updateReport} />
+            : tab === "trash"
+            ? <TrashList reports={reports.filter((r) => r.deleted)} onRestore={restoreReport} onPermanentDelete={permanentlyDelete} />
+            : <Ranking reports={reports.filter((r) => !r.deleted)} />
           }
         </div>
 
@@ -138,11 +143,17 @@ export default function AdminApp() {
           {[
             { id: "list",    label: "신고 현황", icon: ClipboardList },
             { id: "ranking", label: "참여현황", icon: Trophy },
-          ].map(({ id, label, icon: Icon }) => {
+            { id: "trash",   label: "휴지통",   icon: Trash2, badge: trashCount },
+          ].map(({ id, label, icon: Icon, badge }) => {
             const active = tab === id;
             return (
-              <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: active ? C.blue : C.muted, borderTop: `2px solid ${active ? C.blue : "transparent"}`, marginTop: -1 }}>
-                <Icon size={20} strokeWidth={active ? 2.4 : 2} />
+              <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: active ? C.blue : C.muted, borderTop: `2px solid ${active ? C.blue : "transparent"}`, marginTop: -1, position: "relative" }}>
+                <div style={{ position: "relative" }}>
+                  <Icon size={20} strokeWidth={active ? 2.4 : 2} />
+                  {!!badge && (
+                    <span style={{ position: "absolute", top: -6, right: -8, background: C.red, color: "#fff", fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: "1px 5px", lineHeight: 1.3 }}>{badge}</span>
+                  )}
+                </div>
                 <span style={{ fontSize: 11, fontWeight: active ? 600 : 500 }}>{label}</span>
               </button>
             );
@@ -351,6 +362,66 @@ function ReportList({ reports, onDelete, onUpdate }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ════════════════════════════ 휴지통 ════════════════════════════ */
+function TrashList({ reports, onRestore, onPermanentDelete }) {
+  const [confirmId, setConfirmId] = useState(null);
+  const sorted = [...reports].sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
+
+  if (sorted.length === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
+        <Trash2 size={30} strokeWidth={1.5} />
+        <span style={{ fontSize: 13 }}>휴지통이 비어있어요.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ animation: "fadein .3s ease" }}>
+      <p style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.6 }}>
+        삭제된 신고는 여기서 복구하거나 완전히 지울 수 있어요.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {sorted.map((r) => {
+          const h = hazardOf(r.hazard);
+          return (
+            <div key={r.id} style={{ background: C.surface, borderRadius: 12, padding: 12, borderLeft: `4px solid ${C.line}`, opacity: 0.85 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: h.color }}>{hazardLabel(r)}</span>
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                <MapPin size={12} color={C.muted} /> {r.location}
+              </div>
+              <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
+                {r.deletedAt ? `${fmtDateTime(r.deletedAt)} 삭제됨` : ""}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={() => onRestore(r.id)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: `${C.blue}18`, border: `1px solid ${C.blue}`, borderRadius: 8, padding: "7px 0", color: C.blue, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                  <RefreshCw size={12} /> 복구
+                </button>
+                <button onClick={() => setConfirmId(r.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 0", color: C.muted, fontSize: 12.5, cursor: "pointer" }}>
+                  완전 삭제
+                </button>
+              </div>
+
+              {confirmId === r.id && (
+                <div style={{ marginTop: 10, background: C.surfaceAlt, borderRadius: 8, padding: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>영구 삭제할까요? 되돌릴 수 없어요.</span>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => setConfirmId(null)} style={{ fontSize: 12, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>취소</button>
+                    <button onClick={() => { onPermanentDelete(r.id); setConfirmId(null); }} style={{ fontSize: 12, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>삭제</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

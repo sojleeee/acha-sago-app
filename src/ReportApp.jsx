@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport } from "./firebase";
+import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport, findActionReportsByName } from "./firebase";
 import {
   AlertTriangle, Camera, MapPin, Clock, User,
   X, Loader2, Send, CheckCircle2, ChevronRight,
@@ -208,6 +208,7 @@ export default function ReportApp() {
                 <PendingActions reports={pendingReports} onResume={handleResume} onRemoveAll={handleRemoveAllPending} />
               )}
               <ReportForm onSubmit={addReport} />
+              <FindByName onResume={handleResume} />
             </>
           )}
         </div>
@@ -283,6 +284,91 @@ function PendingActions({ reports, onResume, onRemoveAll }) {
     </div>
   );
 }
+
+/* ════════════════════════════ 이름으로 미완료 조치 찾기 (다른 기기용) ════════════════════════════ */
+function FindByName({ onResume }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState(null);
+  const [error, setError] = useState("");
+
+  const handleSearch = async () => {
+    if (!name.trim()) { setError("이름을 입력해주세요."); return; }
+    setSearching(true);
+    setError("");
+    try {
+      const found = await findActionReportsByName(name.trim());
+      found.forEach((r) => addPendingId(r.id)); // 이 기기에도 등록해서 이후엔 자동으로 뜨게
+      setResults(found);
+    } catch {
+      setError("검색 중 오류가 발생했어요. 다시 시도해주세요.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", background: "transparent", border: "none", color: C.muted, fontSize: 12.5, cursor: "pointer", marginTop: 16, padding: "6px 0" }}
+      >
+        다른 기기에서 시작한 조치가 있으신가요? 이름으로 찾기
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, marginTop: 16, animation: "fadein .3s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>이름으로 찾기</span>
+        <button onClick={() => { setOpen(false); setResults(null); setName(""); setError(""); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 2 }}>
+          <X size={15} />
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          value={name}
+          onChange={(e) => { setName(e.target.value); setError(""); }}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          placeholder="신고할 때 입력한 이름"
+          style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${error ? C.red : C.line}`, borderRadius: 8, color: C.text, fontSize: 13, padding: "9px 12px" }}
+        />
+        <button onClick={handleSearch} disabled={searching} style={{ background: C.yellow, border: "none", borderRadius: 8, padding: "0 16px", color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: searching ? 0.7 : 1 }}>
+          {searching ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : "찾기"}
+        </button>
+      </div>
+      {error && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{error}</div>}
+
+      {results !== null && (
+        <div style={{ marginTop: 12 }}>
+          {results.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: C.muted, textAlign: "center", padding: "10px 0" }}>완료하지 않은 조치가 없어요.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {results.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => onResume(r)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
+                    <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: C.yellow, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
+                  <ChevronRight size={16} color={C.yellow} style={{ flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, onBackToChoose }) {
   const steps = [
@@ -391,7 +477,7 @@ function StepAction({ onDone, onBack }) {
   const [actionDesc, setActionDesc]   = useState("");
   const [actionPhoto, setActionPhoto] = useState(null);
   const [photoBusy, setPhotoBusy]     = useState(false);
-  const [error, setError]             = useState("");
+  const [errors, setErrors]           = useState({});
   const [submitting, setSubmitting]   = useState(false);
   const fileRef = useRef(null);
 
@@ -399,13 +485,17 @@ function StepAction({ onDone, onBack }) {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoBusy(true);
-    try   { setActionPhoto(await compressImage(file)); }
-    catch { /* silent */ }
+    try   { setActionPhoto(await compressImage(file)); setErrors((p) => ({ ...p, photo: undefined })); }
+    catch { setErrors((p) => ({ ...p, photo: "사진 처리에 실패했어요." })); }
     finally { setPhotoBusy(false); }
   };
 
   const handleSubmit = async () => {
-    if (!actionDesc.trim()) { setError("조치 내용을 입력해주세요."); return; }
+    const e = {};
+    if (!actionDesc.trim()) e.desc = "조치 내용을 입력해주세요.";
+    if (!actionPhoto)       e.photo = "조치 후 사진을 첨부해주세요.";
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
     setSubmitting(true);
     await onDone({ actionDesc: actionDesc.trim(), actionPhoto });
     setSubmitting(false);
@@ -417,7 +507,7 @@ function StepAction({ onDone, onBack }) {
       <div className="osw" style={{ fontSize: 17, fontWeight: 700 }}>조치 내용을 기록해주세요</div>
 
       <div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 후 사진 (선택)</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 후 사진 (필수)</div>
         {actionPhoto ? (
           <div style={{ position: "relative", width: 130 }}>
             <img src={actionPhoto} alt="조치 사진" style={{ width: 130, height: 130, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
@@ -426,19 +516,20 @@ function StepAction({ onDone, onBack }) {
             </button>
           </div>
         ) : (
-          <button onClick={() => fileRef.current?.click()} disabled={photoBusy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: C.surface, border: `1.5px dashed ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 13 }}>
+          <button onClick={() => fileRef.current?.click()} disabled={photoBusy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: C.surface, border: `1.5px dashed ${errors.photo ? C.red : C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 13 }}>
             {photoBusy ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Camera size={16} />}
             {photoBusy ? "처리 중…" : "조치 후 사진 찍기"}
           </button>
         )}
         <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
+        {errors.photo && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{errors.photo}</div>}
       </div>
 
       <div>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 내용</div>
-        <textarea value={actionDesc} onChange={(e) => { setActionDesc(e.target.value); setError(""); }} placeholder={"어떤 조치를 취했는지 적어주세요.\n예: 미끄럼 방지 테이프 부착, 안전 표지판 설치 등"} rows={4}
-          style={{ width: "100%", background: C.surface, border: `1px solid ${error ? C.red : C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
-        {error && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{error}</div>}
+        <textarea value={actionDesc} onChange={(e) => { setActionDesc(e.target.value); setErrors((p) => ({ ...p, desc: undefined })); }} placeholder={"어떤 조치를 취했는지 적어주세요.\n예: 미끄럼 방지 테이프 부착, 안전 표지판 설치 등"} rows={4}
+          style={{ width: "100%", background: C.surface, border: `1px solid ${errors.desc ? C.red : C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
+        {errors.desc && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{errors.desc}</div>}
       </div>
 
       <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"

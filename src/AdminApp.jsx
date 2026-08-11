@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDeleteReport, registerForPush } from "./firebase";
+import * as XLSX from "xlsx";
 import {
   ClipboardList, Trophy, Camera, MapPin, User,
   Trash2, X, Loader2, Award, Medal, Sprout, ImageOff,
-  ShieldCheck, RefreshCw, KeyRound, Lock
+  ShieldCheck, RefreshCw, KeyRound, Lock, Search, Download, Calendar, SlidersHorizontal
 } from "lucide-react";
 
 const C = {
@@ -154,21 +155,60 @@ export default function AdminApp() {
 
 /* ════════════════════════════ 신고 목록 ════════════════════════════ */
 function ReportList({ reports, onDelete, onUpdate }) {
-  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | progress | deferred | done
+  const [statusFilter, setStatusFilter] = useState("all"); // all | progress | deferred | done
   const [photoView, setPhotoView]   = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
-
   const [hazardFilter, setHazardFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
   let filtered = reports;
-  if (statusFilter === "progress") filtered = reports.filter((r) => r.status === "pending" || r.status === "action");
-  if (statusFilter === "deferred") filtered = reports.filter((r) => r.status === "deferred");
-  if (statusFilter === "done") filtered = reports.filter((r) => r.status === "done");
+  if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "pending" || r.status === "action");
+  if (statusFilter === "deferred") filtered = filtered.filter((r) => r.status === "deferred");
+  if (statusFilter === "done") filtered = filtered.filter((r) => r.status === "done");
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
+  if (searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    filtered = filtered.filter((r) =>
+      (r.location || "").toLowerCase().includes(q) ||
+      (r.reporterName || "").toLowerCase().includes(q) ||
+      (r.dept || "").toLowerCase().includes(q) ||
+      (r.desc || "").toLowerCase().includes(q)
+    );
+  }
+  if (dateFrom) filtered = filtered.filter((r) => r.occurredAt && r.occurredAt >= dateFrom);
+  if (dateTo) filtered = filtered.filter((r) => r.occurredAt && r.occurredAt <= `${dateTo}T23:59`);
+
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const progressCount = reports.filter((r) => r.status === "pending" || r.status === "action").length;
   const deferredCount = reports.filter((r) => r.status === "deferred").length;
   const doneCount     = reports.filter((r) => r.status === "done").length;
+
+  const handleExport = () => {
+    const rows = sorted.map((r) => ({
+      "위험유형": hazardLabel(r),
+      "발생일시": fmtDateTime(r.occurredAt),
+      "발생장소": r.location || "",
+      "소속": r.dept || "",
+      "이름": r.isAnonymous ? "익명" : (r.reporterName || ""),
+      "상황설명": r.desc || "",
+      "상태": (STATUS_META[r.status] || STATUS_META.pending).label,
+      "조치내용": r.actionDesc || "",
+      "조치일시": r.actionAt ? fmtDateTime(r.actionAt) : "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 12 }, { wch: 10 },
+      { wch: 30 }, { wch: 12 }, { wch: 30 }, { wch: 18 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "신고현황");
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `아차사고_신고현황_${today}.xlsx`);
+  };
 
   return (
     <div style={{ animation: "fadein .3s ease" }}>
@@ -179,6 +219,51 @@ function ReportList({ reports, onDelete, onUpdate }) {
         <StatBadge label="즉시조치불가" value={deferredCount} color={C.red} active={statusFilter === "deferred"} onClick={() => setStatusFilter("deferred")} />
         <StatBadge label="조치완료" value={doneCount} color={C.green} active={statusFilter === "done"} onClick={() => setStatusFilter("done")} />
       </div>
+
+      {/* 검색 + 필터 토글 + 내보내기 */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
+          <Search size={15} color={C.muted} style={{ flexShrink: 0 }} />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="장소, 이름, 소속, 내용 검색"
+            style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 13, padding: "9px 0", minWidth: 0 }}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 2, flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          style={{ display: "flex", alignItems: "center", gap: 5, background: (dateFrom || dateTo) ? `${C.blue}22` : C.surface, border: `1.5px solid ${(dateFrom || dateTo) ? C.blue : C.line}`, borderRadius: 10, padding: "0 12px", color: (dateFrom || dateTo) ? C.blue : C.muted, cursor: "pointer", flexShrink: 0 }}
+        >
+          <Calendar size={15} />
+        </button>
+        <button
+          onClick={handleExport}
+          disabled={sorted.length === 0}
+          style={{ display: "flex", alignItems: "center", gap: 5, background: C.green, border: "none", borderRadius: 10, padding: "0 14px", color: C.bg, cursor: sorted.length === 0 ? "default" : "pointer", flexShrink: 0, opacity: sorted.length === 0 ? 0.5 : 1, fontWeight: 700, fontSize: 12.5 }}
+        >
+          <Download size={14} /> 엑셀
+        </button>
+      </div>
+
+      {showFilters && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+          <span style={{ fontSize: 11.5, color: C.muted, flexShrink: 0 }}>기간</span>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 6, color: C.text, fontSize: 12.5, padding: "6px 8px", minWidth: 0 }} />
+          <span style={{ color: C.muted, fontSize: 12 }}>~</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 6, color: C.text, fontSize: 12.5, padding: "6px 8px", minWidth: 0 }} />
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 2, flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 위험유형 필터 */}
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 14 }}>
@@ -275,12 +360,12 @@ function StatBadge({ label, value, color, active, onClick }) {
     <button
       onClick={onClick}
       style={{
-        flex: 1, background: active ? `${color}22` : C.surface, borderRadius: 10, padding: "10px 6px",
+        flex: 1, background: active ? `${color}22` : C.surface, borderRadius: 9, padding: "8px 3px",
         textAlign: "center", border: `1.5px solid ${active ? color : C.line}`, cursor: "pointer", minWidth: 0,
       }}
     >
-      <div className="mono" style={{ fontSize: 18, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 10, color: active ? color : C.muted, marginTop: 2, fontWeight: active ? 700 : 400, whiteSpace: "nowrap" }}>{label}</div>
+      <div className="mono" style={{ fontSize: 16, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 9.5, color: active ? color : C.muted, marginTop: 2, fontWeight: active ? 700 : 400, whiteSpace: "nowrap" }}>{label}</div>
     </button>
   );
 }

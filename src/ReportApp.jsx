@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport } from "./firebase";
+import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport, getAllReports } from "./firebase";
 import {
   AlertTriangle, Camera, MapPin, Clock, User,
   X, Loader2, Send, CheckCircle2, ChevronRight,
-  Wrench, Clock3, CircleCheck, ClipboardList
+  Wrench, Clock3, CircleCheck, ClipboardList, Trophy, Search, Award, Medal, Sprout
 } from "lucide-react";
 
 // ── 팔레트 ──────────────────────────────────────────
@@ -75,6 +75,7 @@ function compressImage(file, maxW = 900, quality = 0.62) {
 
 /* ════════════════════════════ ROOT ════════════════════════════ */
 export default function ReportApp() {
+  const [tab, setTab] = useState("report"); // report | myRank
   const [flow, setFlow] = useState(null);
   const [currentId, setCurrentId] = useState(null);
   const [currentReport, setCurrentReport] = useState(null);
@@ -193,6 +194,8 @@ export default function ReportApp() {
               onEnd={handleFlowEnd}
               onBackToChoose={handleBackToChoose}
             />
+          ) : tab === "myRank" ? (
+            <MyRank />
           ) : (
             <>
               {!pendingLoading && pendingReports.length > 0 && (
@@ -205,11 +208,15 @@ export default function ReportApp() {
 
         {/* 하단 탭 */}
         {!flow && (
-          <div style={{ position: "sticky", bottom: 0, background: C.surface, borderTop: `1px solid ${C.line}`, display: "flex", justifyContent: "center", padding: "12px 0 18px" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: C.yellow }}>
-              <AlertTriangle size={20} strokeWidth={2.4} />
-              <span style={{ fontSize: 11, fontWeight: 600 }}>발견하기</span>
-            </div>
+          <div style={{ position: "sticky", bottom: 0, background: C.surface, borderTop: `1px solid ${C.line}`, display: "flex" }}>
+            <button onClick={() => setTab("report")} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: tab === "report" ? C.yellow : C.muted, borderTop: `2px solid ${tab === "report" ? C.yellow : "transparent"}`, marginTop: -1 }}>
+              <AlertTriangle size={20} strokeWidth={tab === "report" ? 2.4 : 2} />
+              <span style={{ fontSize: 11, fontWeight: tab === "report" ? 600 : 500 }}>발견하기</span>
+            </button>
+            <button onClick={() => setTab("myRank")} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: tab === "myRank" ? C.yellow : C.muted, borderTop: `2px solid ${tab === "myRank" ? C.yellow : "transparent"}`, marginTop: -1 }}>
+              <Trophy size={20} strokeWidth={tab === "myRank" ? 2.4 : 2} />
+              <span style={{ fontSize: 11, fontWeight: tab === "myRank" ? 600 : 500 }}>내 순위</span>
+            </button>
           </div>
         )}
       </div>
@@ -276,6 +283,106 @@ function PendingActions({ reports, onResume, onRemoveAll }) {
 }
 
 /* ════════════════════════════ 이름으로 미완료 조치 찾기 (다른 기기용) ════════════════════════════ */
+/* ════════════════════════════ 내 순위 ════════════════════════════ */
+function getTier(count) {
+  if (count >= 11) return { label: "골드 파수꾼",   icon: Award,  color: C.yellow };
+  if (count >= 6)  return { label: "실버 파수꾼",   icon: Medal,  color: "#C7CDD6" };
+  if (count >= 3)  return { label: "브론즈 파수꾼", icon: Medal,  color: "#C77D4C" };
+  return                   { label: "새싹 파수꾼",  icon: Sprout, color: C.green };
+}
+
+function MyRank() {
+  const [name, setName] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [result, setResult] = useState(null); // { rank, total, done, totalPeople } | "notfound" | null
+  const [error, setError] = useState("");
+
+  const handleSearch = async () => {
+    if (!name.trim()) { setError("이름을 입력해주세요."); return; }
+    setSearching(true);
+    setError("");
+    setResult(null);
+    try {
+      const reports = await getAllReports();
+      const map = {};
+      reports.filter((r) => !r.isAnonymous && r.reporterName).forEach((r) => {
+        if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, total: 0, done: 0 };
+        map[r.reporterName].total += 1;
+        if (r.status === "done") map[r.reporterName].done += 1;
+      });
+      const ranked = Object.values(map).sort((a, b) => b.total - a.total);
+      const idx = ranked.findIndex((p) => p.name === name.trim());
+      if (idx === -1) {
+        setResult("notfound");
+      } else {
+        setResult({ rank: idx + 1, total: ranked[idx].total, done: ranked[idx].done, totalPeople: ranked.length });
+      }
+    } catch {
+      setError("조회 중 오류가 발생했어요. 다시 시도해주세요.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  return (
+    <div style={{ animation: "fadein .3s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <Trophy size={20} color={C.yellow} />
+        <span className="osw" style={{ fontSize: 18, fontWeight: 700 }}>내 순위 확인하기</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${error ? C.red : C.line}`, borderRadius: 10, padding: "0 12px" }}>
+          <User size={15} color={C.muted} style={{ flexShrink: 0 }} />
+          <input
+            value={name}
+            onChange={(e) => { setName(e.target.value); setError(""); }}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="이름을 입력하세요"
+            style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, padding: "10px 0", minWidth: 0 }}
+          />
+        </div>
+        <button onClick={handleSearch} disabled={searching} style={{ background: C.yellow, border: "none", borderRadius: 10, padding: "0 18px", color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: searching ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+          {searching ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : <Search size={15} />}
+          확인
+        </button>
+      </div>
+      {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{error}</div>}
+
+      {result === "notfound" && (
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, padding: 20, textAlign: "center", marginTop: 16 }}>
+          <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>아직 등록된 발견이 없어요.<br />첫 발견을 등록해보세요!</p>
+        </div>
+      )}
+
+      {result && result !== "notfound" && (() => {
+        const tier = getTier(result.total);
+        const TierIcon = tier.icon;
+        return (
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 16, padding: 24, textAlign: "center", marginTop: 16, animation: "popin .3s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 4 }}>
+              <TierIcon size={18} color={tier.color} />
+              <span style={{ fontSize: 12.5, color: tier.color, fontWeight: 700 }}>{tier.label}</span>
+            </div>
+            <div className="mono" style={{ fontSize: 40, fontWeight: 700, color: C.yellow, margin: "8px 0" }}>{result.rank}<span style={{ fontSize: 18, color: C.muted }}>위</span></div>
+            <p style={{ fontSize: 12.5, color: C.muted, marginBottom: 18 }}>전체 {result.totalPeople}명 중</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "10px 6px" }}>
+                <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{result.total}</div>
+                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>전체 발견</div>
+              </div>
+              <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "10px 6px" }}>
+                <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{result.done}</div>
+                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>조치 완료</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, onBackToChoose }) {
   const steps = [
     { id: "choose",       label: "조치 선택" },
@@ -442,7 +549,7 @@ function StepAction({ onDone, onBack }) {
 function StepDone({ report, onEnd }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 90, height: 90, borderRadius: "50%", background: `${C.green}22`, border: `3px solid ${C.green}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <div style={{ width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img src="/icon-done.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
@@ -450,7 +557,7 @@ function StepDone({ report, onEnd }) {
         <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>안전한 현장을 만들어주셔서 감사합니다.</p>
       </div>
       <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
-        새로 발견하기
+        돌아가기
       </button>
     </div>
   );

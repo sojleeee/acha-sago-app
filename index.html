@@ -17,6 +17,8 @@
       if (location.hostname.startsWith("acha-sago-admin") || location.pathname.startsWith("/admin")) {
         document.getElementById("manifest-link").setAttribute("href", "/manifest-admin.json");
         document.querySelector('meta[name="theme-color"]').setAttribute("content", "#5A9BE8");
+        document.querySelector('link[rel="apple-touch-icon"]').setAttribute("href", "/icon-192-admin.png");
+        document.querySelector('link[rel="icon"]').setAttribute("href", "/icon-192-admin.png");
       }
     </script>
     <script type="module" src="/src/main.jsx"></script>

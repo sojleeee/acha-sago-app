@@ -1,4 +1,5 @@
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -47,5 +48,24 @@ exports.notifyOnStatusChange = onDocumentUpdated(
     } else if (after.status === "done" && before.status !== "done") {
       await sendToAdmins(after, "조치 완료");
     }
+  }
+);
+
+// 매일 새벽 3시, 휴지통에 30일 넘게 있는 신고를 자동으로 완전 삭제합니다.
+exports.cleanupTrash = onSchedule(
+  { schedule: "0 3 * * *", timeZone: "Asia/Seoul", region: "asia-northeast3" },
+  async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffISO = cutoff.toISOString();
+
+    const snap = await db.collection("reports").where("deleted", "==", true).get();
+    const targets = snap.docs.filter((d) => {
+      const deletedAt = d.data().deletedAt;
+      return deletedAt && deletedAt < cutoffISO;
+    });
+
+    await Promise.all(targets.map((d) => d.ref.delete()));
+    console.log(`휴지통 정리: ${targets.length}건 완전 삭제`);
   }
 );

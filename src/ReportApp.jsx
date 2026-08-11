@@ -16,6 +16,14 @@ const C = {
 
 // ── 미완료 조치 로컬 저장 (이 기기에서 "즉시 조치 가능" 선택했지만 아직 완료 안 한 신고) ──
 const PENDING_KEY = "acha-pending-actions";
+const MY_NAME_KEY = "acha-my-name";
+
+function saveMyName(name) {
+  try { localStorage.setItem(MY_NAME_KEY, name); } catch {}
+}
+function loadMyName() {
+  try { return localStorage.getItem(MY_NAME_KEY) || ""; } catch { return ""; }
+}
 
 function loadPendingIds() {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]"); }
@@ -296,9 +304,10 @@ function MyRank() {
   const [searching, setSearching] = useState(false);
   const [result, setResult] = useState(null); // { rank, total, done, totalPeople } | "notfound" | null
   const [error, setError] = useState("");
+  const [autoChecked, setAutoChecked] = useState(false);
 
-  const handleSearch = async () => {
-    if (!name.trim()) { setError("이름을 입력해주세요."); return; }
+  const runSearch = async (targetName) => {
+    if (!targetName.trim()) { setError("이름을 입력해주세요."); return; }
     setSearching(true);
     setError("");
     setResult(null);
@@ -311,7 +320,7 @@ function MyRank() {
         if (r.status === "done") map[r.reporterName].done += 1;
       });
       const ranked = Object.values(map).sort((a, b) => b.total - a.total);
-      const idx = ranked.findIndex((p) => p.name === name.trim());
+      const idx = ranked.findIndex((p) => p.name === targetName.trim());
       if (idx === -1) {
         setResult("notfound");
       } else {
@@ -324,42 +333,50 @@ function MyRank() {
     }
   };
 
+  // 신고할 때 입력했던 이름이 이 기기에 저장되어 있으면 자동으로 조회
+  useEffect(() => {
+    const saved = loadMyName();
+    if (saved) {
+      setName(saved);
+      runSearch(saved);
+    }
+    setAutoChecked(true);
+  }, []);
+
+  const handleSearch = () => runSearch(name);
+
+  if (!autoChecked) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
+        <Loader2 size={22} color={C.muted} style={{ animation: "spin 1s linear infinite" }} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ animation: "fadein .3s ease" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <Trophy size={20} color={C.yellow} />
-        <span className="osw" style={{ fontSize: 18, fontWeight: 700 }}>내 순위 확인하기</span>
+        <span className="osw" style={{ fontSize: 18, fontWeight: 700 }}>내 순위</span>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${error ? C.red : C.line}`, borderRadius: 10, padding: "0 12px" }}>
-          <User size={15} color={C.muted} style={{ flexShrink: 0 }} />
-          <input
-            value={name}
-            onChange={(e) => { setName(e.target.value); setError(""); }}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="이름을 입력하세요"
-            style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, padding: "10px 0", minWidth: 0 }}
-          />
+      {searching && !result && (
+        <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+          <Loader2 size={22} color={C.muted} style={{ animation: "spin 1s linear infinite" }} />
         </div>
-        <button onClick={handleSearch} disabled={searching} style={{ background: C.yellow, border: "none", borderRadius: 10, padding: "0 18px", color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: searching ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
-          {searching ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : <Search size={15} />}
-          확인
-        </button>
-      </div>
-      {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{error}</div>}
+      )}
 
-      {result === "notfound" && (
-        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, padding: 20, textAlign: "center", marginTop: 16 }}>
+      {!searching && result === "notfound" && (
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, padding: 20, textAlign: "center" }}>
           <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>아직 등록된 발견이 없어요.<br />첫 발견을 등록해보세요!</p>
         </div>
       )}
 
-      {result && result !== "notfound" && (() => {
+      {!searching && result && result !== "notfound" && (() => {
         const tier = getTier(result.total);
         const TierIcon = tier.icon;
         return (
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 16, padding: 24, textAlign: "center", marginTop: 16, animation: "popin .3s ease" }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 16, padding: 24, textAlign: "center", animation: "popin .3s ease" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 4 }}>
               <TierIcon size={18} color={tier.color} />
               <span style={{ fontSize: 12.5, color: tier.color, fontWeight: 700 }}>{tier.label}</span>
@@ -379,6 +396,28 @@ function MyRank() {
           </div>
         );
       })()}
+
+      {!searching && !result && (
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, padding: 20 }}>
+          <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, textAlign: "center", marginBottom: 14 }}>이 기기에 저장된 기록이 없어요.<br />이름을 입력해서 확인해보세요.</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.surfaceAlt, border: `1px solid ${error ? C.red : C.line}`, borderRadius: 10, padding: "0 12px" }}>
+              <User size={15} color={C.muted} style={{ flexShrink: 0 }} />
+              <input
+                value={name}
+                onChange={(e) => { setName(e.target.value); setError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                placeholder="이름을 입력하세요"
+                style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, padding: "10px 0", minWidth: 0 }}
+              />
+            </div>
+            <button onClick={handleSearch} style={{ background: C.yellow, border: "none", borderRadius: 10, padding: "0 16px", color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <Search size={15} />
+            </button>
+          </div>
+          {error && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{error}</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -625,6 +664,7 @@ function ReportForm({ onSubmit }) {
   const handleSubmit = async () => {
     if (!validate()) return;
     setSubmitting(true);
+    saveMyName(name.trim());
     await onSubmit({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       reporterName: name.trim(), dept: dept.trim(),

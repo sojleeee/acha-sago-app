@@ -223,7 +223,7 @@ export default function ReportApp() {
             </button>
             <button onClick={() => setTab("myRank")} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: tab === "myRank" ? C.yellow : C.muted, borderTop: `2px solid ${tab === "myRank" ? C.yellow : "transparent"}`, marginTop: -1 }}>
               <Trophy size={20} strokeWidth={tab === "myRank" ? 2.4 : 2} />
-              <span style={{ fontSize: 11, fontWeight: tab === "myRank" ? 600 : 500 }}>내 순위</span>
+              <span style={{ fontSize: 11, fontWeight: tab === "myRank" ? 600 : 500 }}>참여현황</span>
             </button>
           </div>
         )}
@@ -290,8 +290,7 @@ function PendingActions({ reports, onResume, onRemoveAll }) {
   );
 }
 
-/* ════════════════════════════ 이름으로 미완료 조치 찾기 (다른 기기용) ════════════════════════════ */
-/* ════════════════════════════ 내 순위 ════════════════════════════ */
+/* ════════════════════════════ 참여현황 (관리자앱과 동일) ════════════════════════════ */
 function getTier(count) {
   if (count >= 11) return { label: "골드 파수꾼",   icon: Award,  color: C.yellow };
   if (count >= 6)  return { label: "실버 파수꾼",   icon: Medal,  color: "#C7CDD6" };
@@ -300,52 +299,32 @@ function getTier(count) {
 }
 
 function MyRank() {
-  const [name, setName] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [result, setResult] = useState(null); // { rank, total, done, totalPeople } | "notfound" | null
-  const [error, setError] = useState("");
-  const [autoChecked, setAutoChecked] = useState(false);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const runSearch = async (targetName) => {
-    if (!targetName.trim()) { setError("이름을 입력해주세요."); return; }
-    setSearching(true);
-    setError("");
-    setResult(null);
-    try {
-      const reports = await getAllReports();
-      const map = {};
-      reports.filter((r) => !r.isAnonymous && r.reporterName).forEach((r) => {
-        if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, total: 0, done: 0 };
-        map[r.reporterName].total += 1;
-        if (r.status === "done") map[r.reporterName].done += 1;
-      });
-      const ranked = Object.values(map).sort((a, b) => b.total - a.total);
-      const idx = ranked.findIndex((p) => p.name === targetName.trim());
-      if (idx === -1) {
-        setResult("notfound");
-      } else {
-        setResult({ rank: idx + 1, total: ranked[idx].total, done: ranked[idx].done, totalPeople: ranked.length });
-      }
-    } catch {
-      setError("조회 중 오류가 발생했어요. 다시 시도해주세요.");
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  // 신고할 때 입력했던 이름이 이 기기에 저장되어 있으면 자동으로 조회
   useEffect(() => {
-    const saved = loadMyName();
-    if (saved) {
-      setName(saved);
-      runSearch(saved);
-    }
-    setAutoChecked(true);
+    (async () => {
+      try {
+        const all = await getAllReports();
+        setReports(all);
+      } catch { setReports([]); }
+      finally { setLoading(false); }
+    })();
   }, []);
 
-  const handleSearch = () => runSearch(name);
+  const named = reports.filter((r) => r.reporterName);
 
-  if (!autoChecked) {
+  const map = {};
+  named.forEach((r) => {
+    if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, total: 0, done: 0 };
+    map[r.reporterName].total += 1;
+    if (r.status === "done") map[r.reporterName].done += 1;
+  });
+  const ranked = Object.values(map).sort((a, b) => b.total - a.total || b.done - a.done);
+
+  const rankEmoji = (i) => `${i + 1}`;
+
+  if (loading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
         <Loader2 size={22} color={C.muted} style={{ animation: "spin 1s linear infinite" }} />
@@ -353,71 +332,45 @@ function MyRank() {
     );
   }
 
+  if (ranked.length === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
+        <Trophy size={30} strokeWidth={1.5} />
+        <span style={{ fontSize: 13 }}>발견 데이터가 쌓이면 순위가 표시됩니다.</span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ animation: "fadein .3s ease" }}>
+      {/* 헤더 */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-        <Trophy size={20} color={C.yellow} />
-        <span className="osw" style={{ fontSize: 18, fontWeight: 700 }}>내 순위</span>
+        <span style={{ fontSize: 20 }}>🏅</span>
+        <span className="osw" style={{ fontSize: 18, fontWeight: 700 }}>참여 현황</span>
       </div>
 
-      {searching && !result && (
-        <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
-          <Loader2 size={22} color={C.muted} style={{ animation: "spin 1s linear infinite" }} />
-        </div>
-      )}
+      {/* 테이블 헤더 */}
+      <div style={{ display: "flex", alignItems: "center", padding: "8px 14px", marginBottom: 6, borderBottom: `1px solid ${C.line}` }}>
+        <span style={{ width: 36, fontSize: 11.5, fontWeight: 700, color: C.muted }}>순위</span>
+        <span style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: C.muted }}>이름</span>
+        <span style={{ width: 64, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>발견</span>
+      </div>
 
-      {!searching && result === "notfound" && (
-        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, padding: 20, textAlign: "center" }}>
-          <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>아직 등록된 발견이 없어요.<br />첫 발견을 등록해보세요!</p>
-        </div>
-      )}
-
-      {!searching && result && result !== "notfound" && (() => {
-        const tier = getTier(result.total);
-        const TierIcon = tier.icon;
-        return (
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 16, padding: 24, textAlign: "center", animation: "popin .3s ease" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 4 }}>
-              <TierIcon size={18} color={tier.color} />
-              <span style={{ fontSize: 12.5, color: tier.color, fontWeight: 700 }}>{tier.label}</span>
-            </div>
-            <div className="mono" style={{ fontSize: 40, fontWeight: 700, color: C.yellow, margin: "8px 0" }}>{result.rank}<span style={{ fontSize: 18, color: C.muted }}>위</span></div>
-            <p style={{ fontSize: 12.5, color: C.muted, marginBottom: 18 }}>전체 {result.totalPeople}명 중</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "10px 6px" }}>
-                <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{result.total}</div>
-                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>전체 발견</div>
-              </div>
-              <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "10px 6px" }}>
-                <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{result.done}</div>
-                <div style={{ fontSize: 10.5, color: C.muted, marginTop: 2 }}>조치 완료</div>
-              </div>
-            </div>
+      {/* 테이블 행 */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {ranked.map((p, i) => (
+          <div key={p.name} style={{
+            display: "flex", alignItems: "center", padding: "12px 14px",
+            background: C.surface,
+            borderRadius: 10,
+            border: `1px solid ${C.line}`,
+          }}>
+            <span className="mono" style={{ width: 36, fontSize: 13, fontWeight: 700, color: C.muted }}>{rankEmoji(i)}</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.text }}>{p.name}</span>
+            <span className="mono" style={{ width: 64, fontSize: 15, fontWeight: 700, color: C.yellow, textAlign: "center" }}>{p.total}</span>
           </div>
-        );
-      })()}
-
-      {!searching && !result && (
-        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, padding: 20 }}>
-          <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, textAlign: "center", marginBottom: 14 }}>이 기기에 저장된 기록이 없어요.<br />이름을 입력해서 확인해보세요.</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.surfaceAlt, border: `1px solid ${error ? C.red : C.line}`, borderRadius: 10, padding: "0 12px" }}>
-              <User size={15} color={C.muted} style={{ flexShrink: 0 }} />
-              <input
-                value={name}
-                onChange={(e) => { setName(e.target.value); setError(""); }}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                placeholder="이름을 입력하세요"
-                style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, padding: "10px 0", minWidth: 0 }}
-              />
-            </div>
-            <button onClick={handleSearch} style={{ background: C.yellow, border: "none", borderRadius: 10, padding: "0 16px", color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <Search size={15} />
-            </button>
-          </div>
-          {error && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{error}</div>}
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

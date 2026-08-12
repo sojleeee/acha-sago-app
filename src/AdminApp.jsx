@@ -55,6 +55,7 @@ export default function AdminApp() {
   const [authed, setAuthed]   = useState(false);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pushDebug, setPushDebug] = useState(null);
   const [tab, setTab]         = useState("list");
   const [lastLoaded, setLastLoaded] = useState(null);
 
@@ -66,7 +67,7 @@ export default function AdminApp() {
       setLastLoaded(new Date());
       setLoading(false);
     });
-    registerForPush();
+    registerForPush().then((res) => setPushDebug(res));
     return () => unsubscribe();
   }, [authed]);
 
@@ -94,6 +95,13 @@ export default function AdminApp() {
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
       `}</style>
+
+      {pushDebug && !pushDebug.ok && (
+        <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.red, color: "#fff", padding: "10px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span>🔔 알림 등록 실패: {pushDebug.reason}</span>
+          <button onClick={() => setPushDebug(null)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
 
       <div style={{ maxWidth: 440, margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         {/* 헤더 */}
@@ -141,7 +149,7 @@ export default function AdminApp() {
         {/* 하단 탭 */}
         <div style={{ position: "sticky", bottom: 0, display: "flex", background: C.surface, borderTop: `1px solid ${C.line}` }}>
           {[
-            { id: "list",    label: "신고 현황", icon: ClipboardList },
+            { id: "list",    label: "발견 현황", icon: ClipboardList },
             { id: "ranking", label: "참여현황", icon: Trophy },
             { id: "trash",   label: "휴지통",   icon: Trash2, badge: trashCount },
           ].map(({ id, label, icon: Icon, badge }) => {
@@ -216,9 +224,9 @@ function ReportList({ reports, onDelete, onUpdate }) {
       { wch: 30 }, { wch: 12 }, { wch: 30 }, { wch: 18 },
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "신고현황");
+    XLSX.utils.book_append_sheet(wb, ws, "발견현황");
     const today = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `아차사고_신고현황_${today}.xlsx`);
+    XLSX.writeFile(wb, `아차사고_발견현황_${today}.xlsx`);
   };
 
   return (
@@ -287,7 +295,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
       {sorted.length === 0 ? (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
           <ImageOff size={30} strokeWidth={1.5} />
-          <span style={{ fontSize: 13 }}>해당 신고 내역이 없습니다.</span>
+          <span style={{ fontSize: 13 }}>해당 발견 내역이 없습니다.</span>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -334,14 +342,14 @@ function ReportList({ reports, onDelete, onUpdate }) {
                   </span>
                   {r.photo && (
                     <button onClick={() => setPhotoView(r.photo)} style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", color: C.blue, fontSize: 11.5, cursor: "pointer" }}>
-                      <Camera size={12} /> 신고 사진
+                      <Camera size={12} /> 발견 사진
                     </button>
                   )}
                 </div>
 
                 {confirmDel === r.id && (
                   <div style={{ marginTop: 10, background: C.surfaceAlt, borderRadius: 8, padding: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 12, color: C.muted }}>이 신고를 삭제할까요?</span>
+                    <span style={{ fontSize: 12, color: C.muted }}>이 발견을 삭제할까요?</span>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => setConfirmDel(null)} style={{ fontSize: 12, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>취소</button>
                       <button onClick={() => { onDelete(r.id); setConfirmDel(null); }} style={{ fontSize: 12, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>삭제</button>
@@ -383,7 +391,7 @@ function TrashList({ reports, onRestore, onPermanentDelete }) {
   return (
     <div style={{ animation: "fadein .3s ease" }}>
       <p style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.6 }}>
-        삭제된 신고는 여기서 복구하거나 완전히 지울 수 있어요.
+        삭제된 발견은 여기서 복구하거나 완전히 지울 수 있어요.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {sorted.map((r) => {
@@ -469,7 +477,7 @@ function Ranking({ reports }) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
         <ImageOff size={30} strokeWidth={1.5} />
-        <span style={{ fontSize: 13 }}>신고 데이터가 쌓이면 순위가 표시됩니다.</span>
+        <span style={{ fontSize: 13 }}>발견 데이터가 쌓이면 순위가 표시됩니다.</span>
       </div>
     );
   }
@@ -486,7 +494,7 @@ function Ranking({ reports }) {
       <div style={{ display: "flex", alignItems: "center", padding: "8px 14px", marginBottom: 6, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ width: 36, fontSize: 11.5, fontWeight: 700, color: C.muted }}>순위</span>
         <span style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: C.muted }}>이름</span>
-        <span style={{ width: 64, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>신고</span>
+        <span style={{ width: 64, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>발견</span>
         <span style={{ width: 64, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>조치완료</span>
       </div>
 

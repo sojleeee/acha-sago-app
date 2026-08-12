@@ -414,7 +414,7 @@ function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, o
 
       {flow.step === "choose"      && <StepChoose onChoose={onChoose} onBack={onEnd} />}
       {flow.step === "confirmDefer"&& <StepConfirmDefer report={report} onConfirm={onDeferred} onBack={onBackToChoose} />}
-      {flow.step === "action"      && <StepAction onDone={onActionDone} onBack={onBackToChoose} />}
+      {flow.step === "action"      && <StepAction report={report} onDone={onActionDone} onBack={onBackToChoose} />}
       {flow.step === "done"        && <StepDone report={report} onEnd={onEnd} />}
       {flow.step === "deferred"    && <StepDeferred onEnd={onEnd} />}
     </div>
@@ -468,8 +468,19 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
 
       {report && (
         <div style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, textAlign: "left" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+              <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
+              <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
+            </div>
+            <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+              <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
+              <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
+            </div>
+          </div>
           {[
             { label: "위험 유형", value: hazardLabel(report) },
+            { label: "발견 일시", value: fmtDateTime(report.occurredAt) },
             { label: "발견 장소", value: report.location },
             { label: "상황 설명", value: report.desc },
           ].map((r, i, arr) => (
@@ -478,12 +489,17 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
               <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
             </div>
           ))}
+          {report.photo && (
+            <div style={{ paddingTop: 10 }}>
+              <img src={report.photo} alt="첨부 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
+            </div>
+          )}
         </div>
       )}
 
-      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: 12, display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <span style={{ fontSize: 13 }}>⚠️</span>
-        <p style={{ fontSize: 12, color: C.red, lineHeight: 1.6, textAlign: "left" }}>요청 후에는 취소할 수 없어요.<br />내용을 다시 한 번 확인해주세요.</p>
+      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11.5 }}>⚠️</span>
+        <span style={{ fontSize: 11.5, color: C.red }}>요청 후에는 취소할 수 없어요.</span>
       </div>
 
       <div style={{ display: "flex", gap: 10, width: "100%" }}>
@@ -495,7 +511,7 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
 }
 
 /* ── 조치 내용 입력 ── */
-function StepAction({ onDone, onBack }) {
+function StepAction({ report, onDone, onBack }) {
   const [actionDesc, setActionDesc]   = useState("");
   const [actionPhoto, setActionPhoto] = useState(null);
   const [photoBusy, setPhotoBusy]     = useState(false);
@@ -534,16 +550,41 @@ function StepAction({ onDone, onBack }) {
         <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 14 }}>이대로 등록할까요?</div>
 
         <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          {report && (
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
+                  <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
+                </div>
+                <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
+                  <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
+                </div>
+              </div>
+              {[
+                { label: "위험 유형", value: hazardLabel(report) },
+                { label: "발견 장소", value: report.location },
+                { label: "상황 설명", value: report.desc },
+              ].map((r) => (
+                <div key={r.label} style={{ display: "flex", gap: 10, padding: "6px 0" }}>
+                  <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
+                  <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
+                </div>
+              ))}
+              <div style={{ borderTop: `1px solid ${C.line}`, margin: "8px 0" }} />
+            </>
+          )}
           <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
           <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: actionPhoto ? 12 : 0 }}>{actionDesc}</p>
           {actionPhoto && (
-            <img src={actionPhoto} alt="조치 사진" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
+            <img src={actionPhoto} alt="조치 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
           )}
         </div>
 
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 10, padding: 12, marginBottom: 18 }}>
-          <span style={{ fontSize: 13 }}>⚠️</span>
-          <p style={{ fontSize: 12, color: C.green, lineHeight: 1.6 }}>등록 후에는 수정할 수 없어요.<br />내용을 다시 한 번 확인해주세요.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 10, padding: "8px 12px", marginBottom: 18 }}>
+          <span style={{ fontSize: 11.5 }}>⚠️</span>
+          <span style={{ fontSize: 11.5, color: C.green }}>등록 후에는 수정할 수 없어요.</span>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>

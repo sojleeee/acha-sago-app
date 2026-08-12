@@ -501,6 +501,7 @@ function StepAction({ onDone, onBack }) {
   const [photoBusy, setPhotoBusy]     = useState(false);
   const [errors, setErrors]           = useState({});
   const [submitting, setSubmitting]   = useState(false);
+  const [confirming, setConfirming]   = useState(false);
   const fileRef = useRef(null);
 
   const handlePhoto = async (e) => {
@@ -512,16 +513,52 @@ function StepAction({ onDone, onBack }) {
     finally { setPhotoBusy(false); }
   };
 
-  const handleSubmit = async () => {
+  const handleReview = () => {
     const e = {};
     if (!actionDesc.trim()) e.desc = "필수 작성입니다.";
     if (!actionPhoto)       e.photo = "필수 작성입니다.";
     setErrors(e);
     if (Object.keys(e).length > 0) return;
+    setConfirming(true);
+  };
+
+  const handleFinalSubmit = async () => {
     setSubmitting(true);
     await onDone({ actionDesc: actionDesc.trim(), actionPhoto });
     setSubmitting(false);
   };
+
+  if (confirming) {
+    return (
+      <div style={{ animation: "popin .25s ease" }}>
+        <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 14 }}>이대로 등록할까요?</div>
+
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
+          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: actionPhoto ? 12 : 0 }}>{actionDesc}</p>
+          {actionPhoto && (
+            <img src={actionPhoto} alt="조치 사진" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 10, padding: 12, marginBottom: 18 }}>
+          <span style={{ fontSize: 13 }}>⚠️</span>
+          <p style={{ fontSize: 12, color: C.green, lineHeight: 1.6 }}>등록 후에는 수정할 수 없어요.<br />내용을 다시 한 번 확인해주세요.</p>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setConfirming(false)} disabled={submitting} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
+            돌아가기
+          </button>
+          <button onClick={handleFinalSubmit} disabled={submitting} className="osw"
+            style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
+            {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <CircleCheck size={17} />}
+            등록할게요
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadein .25s ease" }}>
@@ -554,9 +591,9 @@ function StepAction({ onDone, onBack }) {
         {errors.desc && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{errors.desc}</div>}
       </div>
 
-      <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
-        {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <CircleCheck size={17} />}
+      <button onClick={handleReview} disabled={photoBusy} className="osw"
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: photoBusy ? 0.7 : 1 }}>
+        <CircleCheck size={17} />
         등록
       </button>
     </div>
@@ -616,7 +653,6 @@ function ReportForm({ onSubmit }) {
   const [photoBusy, setPhotoBusy]   = useState(false);
   const [errors, setErrors]         = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const fileRef = useRef(null);
 
   const handlePhoto = async (e) => {
@@ -641,12 +677,8 @@ function ReportForm({ onSubmit }) {
     return Object.keys(e).length === 0;
   };
 
-  const handleReview = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    setConfirming(true);
-  };
-
-  const handleFinalSubmit = async () => {
     setSubmitting(true);
     saveMyName(name.trim());
     await onSubmit({
@@ -658,7 +690,6 @@ function ReportForm({ onSubmit }) {
       createdAt: new Date().toISOString(),
     });
     setSubmitting(false);
-    setConfirming(false);
     setHazard(HAZARD_TYPES[0].id); setEtcLabel("");
     setOccurredAt(nowLocalInput()); setLocation("");
     setDept(""); setName(""); setDesc(""); setPhoto(null);
@@ -666,19 +697,6 @@ function ReportForm({ onSubmit }) {
   };
 
   const iS = { flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, padding: "10px 0", width: "100%" };
-
-  const hazardDisplayLabel = hazard === "etc" ? etcLabel.trim() : hazardOf(hazard).label;
-
-  if (confirming) {
-    return (
-      <ReportConfirm
-        data={{ hazardLabel: hazardDisplayLabel, occurredAt, location, dept, name, desc, photo }}
-        submitting={submitting}
-        onEdit={() => setConfirming(false)}
-        onSubmit={handleFinalSubmit}
-      />
-    );
-  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadein .3s ease" }}>
@@ -755,9 +773,9 @@ function ReportForm({ onSubmit }) {
         <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
       </Field>
 
-      <button onClick={handleReview} disabled={photoBusy} className="osw"
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: photoBusy ? 0.7 : 1, marginTop: 4 }}>
-        <Send size={16} />
+      <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting || photoBusy ? 0.7 : 1, marginTop: 4 }}>
+        {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={16} />}
         다음으로
       </button>
     </div>
@@ -765,54 +783,6 @@ function ReportForm({ onSubmit }) {
 }
 
 /* ── 제출 전 최종 확인 화면 ── */
-function ReportConfirm({ data, submitting, onEdit, onSubmit }) {
-  const rows = [
-    { label: "위험 유형", value: data.hazardLabel },
-    { label: "발견 일시", value: fmtDateTime(data.occurredAt) },
-    { label: "발견 장소", value: data.location },
-    { label: "소속", value: data.dept },
-    { label: "이름", value: data.name },
-    { label: "상황 설명", value: data.desc },
-  ];
-
-  return (
-    <div style={{ animation: "fadein .3s ease" }}>
-      <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>이대로 제출할까요?</div>
-      <p style={{ fontSize: 12.5, color: C.muted, marginBottom: 18, lineHeight: 1.6 }}>내용을 다시 한 번 확인해주세요.</p>
-
-      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
-        {rows.map((r, i) => (
-          <div key={r.label} style={{ display: "flex", gap: 10, padding: "10px 0", borderBottom: i < rows.length - 1 ? `1px solid ${C.line}` : "none" }}>
-            <div style={{ width: 68, flexShrink: 0, fontSize: 12, color: C.muted, fontWeight: 600 }}>{r.label}</div>
-            <div style={{ flex: 1, fontSize: 13.5, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
-          </div>
-        ))}
-        {data.photo && (
-          <div style={{ paddingTop: 12 }}>
-            <img src={data.photo} alt="첨부 사진" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: 12, marginBottom: 18 }}>
-        <span style={{ fontSize: 13 }}>⚠️</span>
-        <p style={{ fontSize: 12, color: C.red, lineHeight: 1.6 }}>한번 제출하면 수정할 수 없어요.<br />내용을 신중히 확인해주세요.</p>
-      </div>
-
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={onEdit} disabled={submitting} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
-          수정할래요
-        </button>
-        <button onClick={onSubmit} disabled={submitting} className="osw"
-          style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
-          {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={16} />}
-          제출할게요
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function Field({ label, error, children }) {
   return (
     <div>

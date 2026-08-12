@@ -46,10 +46,12 @@ function getDeviceId() {
 export async function registerForPush() {
   try {
     const supported = await isSupported();
-    if (!supported) return null;
+    if (!supported) return { ok: false, reason: "이 브라우저는 푸시 알림을 지원하지 않아요." };
+
+    if (typeof Notification === "undefined") return { ok: false, reason: "Notification API 자체가 없어요." };
 
     const permission = await Notification.requestPermission();
-    if (permission !== "granted") return null;
+    if (permission !== "granted") return { ok: false, reason: `알림 권한이 "${permission}" 상태예요.` };
 
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
     const messaging = getMessaging(app);
@@ -58,25 +60,25 @@ export async function registerForPush() {
       serviceWorkerRegistration: registration,
     });
 
-    if (token) {
-      const deviceId = getDeviceId();
-      await setDoc(doc(db, "adminTokens", deviceId), {
-        token,
-        updatedAt: new Date().toISOString(),
-      });
-      onMessage(messaging, (payload) => {
-        // 앱이 켜져있을 때(포그라운드) 온 알림도 표시
-        const title = payload.notification?.title || "아차사고 발굴";
-        const body = payload.notification?.body || "새 신고가 접수되었습니다.";
-        if (Notification.permission === "granted") {
-          new Notification(title, { body, icon: "/icon-192.png" });
-        }
-      });
-    }
-    return token;
+    if (!token) return { ok: false, reason: "토큰 발급에 실패했어요 (getToken이 빈 값 반환)." };
+
+    const deviceId = getDeviceId();
+    await setDoc(doc(db, "adminTokens", deviceId), {
+      token,
+      updatedAt: new Date().toISOString(),
+    });
+    onMessage(messaging, (payload) => {
+      // 앱이 켜져있을 때(포그라운드) 온 알림도 표시
+      const title = payload.notification?.title || "아차사고 발굴";
+      const body = payload.notification?.body || "새 신고가 접수되었습니다.";
+      if (Notification.permission === "granted") {
+        new Notification(title, { body, icon: "/icon-192.png" });
+      }
+    });
+    return { ok: true, token };
   } catch (e) {
     console.error("푸시 알림 등록 실패", e);
-    return null;
+    return { ok: false, reason: `오류: ${e?.message || e}` };
   }
 }
 

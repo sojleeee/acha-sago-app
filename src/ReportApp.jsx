@@ -413,7 +413,7 @@ function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, o
       )}
 
       {flow.step === "choose"      && <StepChoose onChoose={onChoose} onBack={onEnd} />}
-      {flow.step === "confirmDefer"&& <StepConfirmDefer onConfirm={onDeferred} onBack={onBackToChoose} />}
+      {flow.step === "confirmDefer"&& <StepConfirmDefer report={report} onConfirm={onDeferred} onBack={onBackToChoose} />}
       {flow.step === "action"      && <StepAction onDone={onActionDone} onBack={onBackToChoose} />}
       {flow.step === "done"        && <StepDone report={report} onEnd={onEnd} />}
       {flow.step === "deferred"    && <StepDeferred onEnd={onEnd} />}
@@ -455,16 +455,37 @@ function StepChoose({ onChoose, onBack }) {
 }
 
 /* ── 즉시 조치 불가 확인 모달 ── */
-function StepConfirmDefer({ onConfirm, onBack }) {
+function StepConfirmDefer({ report, onConfirm, onBack }) {
   return (
     <div style={{ animation: "popin .25s ease", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "10px 0", textAlign: "center" }}>
-      <div style={{ width: 160, height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 190, height: 190, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img src="/icon-confirm.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
         <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>담당자에게 조치를 요청할까요?</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>등록한 위험요소가 담당자에게 전달됩니다.</p>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>등록한 위험요소가 담당자에게 전달됩니다.</p>
       </div>
+
+      {report && (
+        <div style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, textAlign: "left" }}>
+          {[
+            { label: "위험 유형", value: hazardLabel(report) },
+            { label: "발견 장소", value: report.location },
+            { label: "상황 설명", value: report.desc },
+          ].map((r, i, arr) => (
+            <div key={r.label} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
+              <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
+              <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: 12, display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <span style={{ fontSize: 13 }}>⚠️</span>
+        <p style={{ fontSize: 12, color: C.red, lineHeight: 1.6, textAlign: "left" }}>요청 후에는 취소할 수 없어요.<br />내용을 다시 한 번 확인해주세요.</p>
+      </div>
+
       <div style={{ display: "flex", gap: 10, width: "100%" }}>
         <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
         <button onClick={onConfirm} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
@@ -545,13 +566,13 @@ function StepAction({ onDone, onBack }) {
 /* ── 조치 완료 ── */
 function StepDone({ report, onEnd }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
+      <div style={{ width: 230, height: 230, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img src="/icon-done.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
-        <div className="osw" style={{ fontSize: 22, fontWeight: 700, color: C.green }}>조치 완료!</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>안전한 현장을 만들어주셔서 감사합니다.</p>
+        <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.green }}>조치 완료!</div>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>안전한 현장을 만들어주셔서 감사합니다.</p>
       </div>
       <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
         돌아가기
@@ -563,17 +584,17 @@ function StepDone({ report, onEnd }) {
 /* ── 즉시 조치 불가 완료 ── */
 function StepDeferred({ onEnd }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
+      <div style={{ width: 230, height: 230, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img src="/icon-undone.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
-        <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.red }}>조치를 요청했습니다!</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>안전한 작업환경을 만드는 데<br />함께해 주셔서 감사합니다.</p>
+        <div className="osw" style={{ fontSize: 19, fontWeight: 700, color: C.red }}>조치를 요청했습니다!</div>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>안전한 작업환경을 만드는 데<br />함께해 주셔서 감사합니다.</p>
       </div>
-      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 12, padding: 14, textAlign: "left" }}>
-        <div style={{ fontSize: 12.5, color: C.red, fontWeight: 600, marginBottom: 4 }}>⚠ 주의사항</div>
-        <p style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>조치 전까지 해당 구역 접근을 제한하고,<br />주변 동료에게 위험 사실을 알려주세요.</p>
+      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11.5, color: C.red, fontWeight: 600, flexShrink: 0 }}>⚠ 주의사항</span>
+        <span style={{ fontSize: 11.5, color: C.muted }}>접근을 제한하고 동료에게 알려주세요.</span>
       </div>
       <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
         돌아가기

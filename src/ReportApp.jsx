@@ -453,8 +453,8 @@ function StepChoose({ onChoose, onBack }) {
 function StepConfirmDefer({ onConfirm, onBack }) {
   return (
     <div style={{ animation: "popin .25s ease", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "10px 0", textAlign: "center" }}>
-      <div style={{ width: 60, height: 60, borderRadius: "50%", background: `${C.red}22`, border: `3px solid ${C.red}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
-        ❗
+      <div style={{ width: 160, height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <img src="/icon-confirm.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
         <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>담당자에게 조치를 요청할까요?</div>
@@ -559,7 +559,7 @@ function StepDone({ report, onEnd }) {
 function StepDeferred({ onEnd }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 90, height: 90, borderRadius: "50%", background: `${C.red}22`, border: `3px solid ${C.red}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <div style={{ width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img src="/icon-undone.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>

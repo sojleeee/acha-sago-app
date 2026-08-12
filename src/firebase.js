@@ -53,7 +53,12 @@ export async function registerForPush() {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, reason: `알림 권한이 "${permission}" 상태예요.` };
 
-    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    let registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    // register()가 resolve돼도 아직 "활성화(active)" 전일 수 있어서(특히 최초 등록 시),
+    // 활성화될 때까지 기다린다. navigator.serviceWorker.ready는 활성화된 워커를 보장한다.
+    if (!registration.active) {
+      registration = await navigator.serviceWorker.ready;
+    }
     const messaging = getMessaging(app);
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,

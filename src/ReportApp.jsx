@@ -604,7 +604,12 @@ function StepAction({ report, onDone, onBack }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadein .25s ease" }}>
       <button onClick={onBack} style={{ background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", padding: 0, textAlign: "left" }}>← 조치 선택으로 돌아가기</button>
-      <div className="osw" style={{ fontSize: 17, fontWeight: 700 }}>조치 내용을 기록해주세요</div>
+
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <img src="/icon-action.png" alt="" style={{ width: 150, height: 150, objectFit: "contain" }} />
+      </div>
+
+      <div className="osw" style={{ fontSize: 17, fontWeight: 700, textAlign: "center" }}>조치 내용을 기록해주세요</div>
 
       <div>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 후 사진을 보여주세요</div>

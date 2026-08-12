@@ -8,10 +8,10 @@ import {
 
 // ── 팔레트 ──────────────────────────────────────────
 const C = {
-  bg: "#161D27", surface: "#212B38", surfaceAlt: "#2A3646",
-  line: "#37455A", text: "#EDF1F5", muted: "#8FA0B3",
-  yellow: "#FFC845", red: "#E85D4C", blue: "#5A9BE8",
-  green: "#4CAF7D", orange: "#E8974C",
+  bg: "#F4F7F0", surface: "#FFFFFF", surfaceAlt: "#EFF4E8",
+  line: "#E0E6D6", text: "#1F2A17", muted: "#77816E",
+  yellow: "#639922", red: "#D6483B", blue: "#5A9BE8",
+  green: "#3B6D11", orange: "#D97B34",
 };
 
 // ── 미완료 조치 로컬 저장 (이 기기에서 "즉시 조치 가능" 선택했지만 아직 완료 안 한 신고) ──
@@ -178,10 +178,10 @@ export default function ReportApp() {
 
       <div style={{ maxWidth: 440, margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         {/* 헤더 */}
-        <div style={{ background: C.surface, borderBottom: `3px solid ${C.yellow}`, padding: "18px 16px 14px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ background: C.surface, borderBottom: `1px solid ${C.line}`, padding: "18px 16px 14px", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: C.yellow, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <AlertTriangle size={20} color={C.bg} strokeWidth={2.5} />
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+              <img src="/icon-192.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <div>
               <div className="osw" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1 }}>아차사고 발굴</div>

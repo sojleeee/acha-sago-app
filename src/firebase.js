@@ -30,6 +30,18 @@ const VAPID_KEY = "BG6MdqoALB9ha1F200gE-yIdF0vaMU1I0tQsY4wfn8NIv_Y9xTYGxrn2gu-fO
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
+// 이 기기에서 처음 등록할 때 한 번 생성해서 계속 재사용하는 고유 ID
+// (토큰 값이 바뀌어도 항상 같은 문서를 덮어써서, 기기당 알림 등록이 1개만 유지되도록)
+function getDeviceId() {
+  const KEY = "acha-device-id";
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    id = `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
 // ── 푸시 알림(FCM) ──────────────────────────────────
 export async function registerForPush() {
   try {
@@ -47,7 +59,8 @@ export async function registerForPush() {
     });
 
     if (token) {
-      await setDoc(doc(db, "adminTokens", token), {
+      const deviceId = getDeviceId();
+      await setDoc(doc(db, "adminTokens", deviceId), {
         token,
         updatedAt: new Date().toISOString(),
       });

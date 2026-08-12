@@ -1,4 +1,4 @@
-const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -32,6 +32,15 @@ async function sendToAdmins(report, statusLabel) {
     console.error("알림 발송 실패", e);
   }
 }
+
+// 새 신고가 접수되는 순간(문서 생성): 바로 알림
+exports.notifyOnNewReport = onDocumentCreated(
+  { document: "reports/{reportId}", region: "asia-northeast3" },
+  async (event) => {
+    const report = event.data.data();
+    await sendToAdmins(report, "신규 접수");
+  }
+);
 
 // - "즉시 조치 불가(deferred)"로 바뀌는 순간: 바로 알림
 // - "조치 완료(done)"로 바뀌는 순간: 알림 (즉시 조치 가능 경로는 완료 시점에 알림)

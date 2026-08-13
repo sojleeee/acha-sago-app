@@ -43,6 +43,8 @@ function getDeviceId() {
 }
 
 // ── 푸시 알림(FCM) ──────────────────────────────────
+let foregroundListenerRegistered = false; // onMessage 리스너 중복 등록 방지용
+
 export async function registerForPush() {
   try {
     const supported = await isSupported();
@@ -72,14 +74,20 @@ export async function registerForPush() {
       token,
       updatedAt: new Date().toISOString(),
     });
-    onMessage(messaging, (payload) => {
-      // 앱이 켜져있을 때(포그라운드) 온 알림도 표시
-      const title = payload.notification?.title || "아차사고 발굴";
-      const body = payload.notification?.body || "새 신고가 접수되었습니다.";
-      if (Notification.permission === "granted") {
-        new Notification(title, { body, icon: "/icon-192.png" });
-      }
-    });
+    // registerForPush()가 여러 번 호출돼도(자동 실행 + "알림 받기" 버튼 클릭 등)
+    // 포그라운드 알림 리스너는 딱 한 번만 등록한다. 안 그러면 리스너가 중복 등록돼
+    // 포그라운드에서 알림이 여러 번 뜬다.
+    if (!foregroundListenerRegistered) {
+      foregroundListenerRegistered = true;
+      onMessage(messaging, (payload) => {
+        // 앱이 켜져있을 때(포그라운드) 온 알림도 표시
+        const title = payload.notification?.title || "아차사고 발굴";
+        const body = payload.notification?.body || "새 신고가 접수되었습니다.";
+        if (Notification.permission === "granted") {
+          new Notification(title, { body, icon: "/icon-192.png" });
+        }
+      });
+    }
     return { ok: true, token };
   } catch (e) {
     console.error("푸시 알림 등록 실패", e);
@@ -126,5 +134,18 @@ export async function getAllReports() {
 export async function findActionReportsByName(name) {
   const q = query(reportsCol, where("reporterName", "==", name), where("status", "==", "action"));
   const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+// 디버그용: 서버(Cloud Function)가 마지막으로 알림을 시도했을 때 남긴 기록을 가져옵니다.
+// Firestore 콘솔에 안 들어가도 앱 안에서 바로 확인할 수 있도록.
+export async function getLastPushAttempt() {
+  const snap = await getDoc(doc(db, "_debug", "lastPushAttempt"));
+  return snap.exists() ? snap.data() : null;
+}
+
+// 디버그용: adminTokens 컬렉션에 지금 등록된 토큰이 몇 개인지 가져옵니다.
+export async function getAdminTokenCount() {
+  const snap = await getDocs(collection(db, "adminTokens"));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

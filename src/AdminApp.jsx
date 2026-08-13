@@ -164,15 +164,15 @@ export default function AdminApp() {
         {/* 하단 탭 */}
         <div style={{ position: "sticky", bottom: 0, display: "flex", background: C.surface, borderTop: `1px solid ${C.line}` }}>
           {[
-            { id: "list",    label: "발견 현황", icon: ClipboardList },
-            { id: "ranking", label: "참여현황", icon: Trophy },
-            { id: "trash",   label: "휴지통",   icon: Trash2, badge: trashCount },
-          ].map(({ id, label, icon: Icon, badge }) => {
+            { id: "list",    label: "발견 현황", emoji: "🔍" },
+            { id: "ranking", label: "참여현황", emoji: "📊" },
+            { id: "trash",   label: "휴지통",   emoji: "🗑️", badge: trashCount },
+          ].map(({ id, label, emoji, badge }) => {
             const active = tab === id;
             return (
               <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: active ? C.blue : C.muted, borderTop: `2px solid ${active ? C.blue : "transparent"}`, marginTop: -1, position: "relative" }}>
                 <div style={{ position: "relative" }}>
-                  <Icon size={20} strokeWidth={active ? 2.4 : 2} />
+                  <span style={{ fontSize: 20, lineHeight: 1, filter: active ? "none" : "grayscale(35%) opacity(0.85)" }}>{emoji}</span>
                   {!!badge && (
                     <span style={{ position: "absolute", top: -6, right: -8, background: C.red, color: "#fff", fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: "1px 5px", lineHeight: 1.3 }}>{badge}</span>
                   )}

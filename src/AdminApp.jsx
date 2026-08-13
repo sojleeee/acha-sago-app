@@ -77,7 +77,7 @@ export default function AdminApp() {
   const updateReport = (id, patch) => fbUpdateReport(id, patch);
   const load = () => setLastLoaded(new Date());
 
-  const newCount = reports.filter((r) => !r.deleted && (r.status === "pending" || r.status === "deferred")).length;
+  const newCount = reports.filter((r) => !r.deleted && r.status === "deferred").length;
   const trashCount = reports.filter((r) => r.deleted).length;
 
   if (!authed) return <PinScreen onSuccess={() => setAuthed(true)} />;
@@ -154,7 +154,7 @@ export default function AdminApp() {
               <span style={{ fontSize: 13 }}>불러오는 중…</span>
             </div>
           ) : tab === "list"
-            ? <ReportList reports={reports.filter((r) => !r.deleted)} onDelete={deleteReport} onUpdate={updateReport} />
+            ? <ReportList reports={reports.filter((r) => !r.deleted && r.status !== "pending")} onDelete={deleteReport} onUpdate={updateReport} />
             : tab === "trash"
             ? <TrashList reports={reports.filter((r) => r.deleted)} onRestore={restoreReport} onPermanentDelete={permanentlyDelete} />
             : <Ranking reports={reports.filter((r) => !r.deleted)} />
@@ -199,7 +199,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
   const [showFilters, setShowFilters] = useState(false);
 
   let filtered = reports;
-  if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "pending" || r.status === "action");
+  if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "action");
   if (statusFilter === "deferred") filtered = filtered.filter((r) => r.status === "deferred");
   if (statusFilter === "done") filtered = filtered.filter((r) => r.status === "done");
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
@@ -217,7 +217,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
 
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  const progressCount = reports.filter((r) => r.status === "pending" || r.status === "action").length;
+  const progressCount = reports.filter((r) => r.status === "action").length;
   const deferredCount = reports.filter((r) => r.status === "deferred").length;
   const doneCount     = reports.filter((r) => r.status === "done").length;
 

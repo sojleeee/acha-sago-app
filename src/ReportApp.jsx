@@ -457,54 +457,54 @@ function StepChoose({ onChoose, onBack }) {
 /* ── 즉시 조치 불가 확인 모달 ── */
 function StepConfirmDefer({ report, onConfirm, onBack }) {
   return (
-    <div style={{ animation: "popin .25s ease", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "10px 0", textAlign: "center" }}>
-      <div style={{ width: 190, height: 190, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src="/icon-confirm.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      </div>
-      <div>
-        <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>담당자에게 조치를 요청할까요?</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>등록한 위험요소가 담당자에게 전달됩니다.</p>
-      </div>
-
-      {report && (
-        <div style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, textAlign: "left" }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
-              <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
-            </div>
-            <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
-              <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
-            </div>
-          </div>
-          {[
-            { label: "위험 유형", value: hazardLabel(report) },
-            { label: "발견 일시", value: fmtDateTime(report.occurredAt) },
-            { label: "발견 장소", value: report.location },
-            { label: "상황 설명", value: report.desc },
-          ].map((r, i, arr) => (
-            <div key={r.label} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
-              <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
-              <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
-            </div>
-          ))}
-          {report.photo && (
-            <div style={{ paddingTop: 10 }}>
-              <img src={report.photo} alt="첨부 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
-            </div>
-          )}
+    <div onClick={onBack} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflowY: "auto" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ animation: "popin .2s ease", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: 20, textAlign: "center", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 18, width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto" }}
+      >
+        <div style={{ width: 150, height: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <img src="/icon-confirm.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
-      )}
+        <div>
+          <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>담당자에게 조치를 요청할까요?</div>
+          <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>등록한 위험요소가 담당자에게 전달됩니다.</p>
+        </div>
 
-      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5 }}>⚠️</span>
-        <span style={{ fontSize: 11.5, color: C.red }}>요청 후에는 취소할 수 없어요.</span>
-      </div>
+        {report && (
+          <div style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, textAlign: "left" }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
+                <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
+              </div>
+              <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
+                <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
+              </div>
+            </div>
+            {[
+              { label: "위험 유형", value: hazardLabel(report) },
+              { label: "발견 일시", value: fmtDateTime(report.occurredAt) },
+              { label: "발견 장소", value: report.location },
+              { label: "상황 설명", value: report.desc },
+            ].map((r, i, arr) => (
+              <div key={r.label} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
+                <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
+              </div>
+            ))}
+            {report.photo && (
+              <div style={{ paddingTop: 10 }}>
+                <img src={report.photo} alt="첨부 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
+              </div>
+            )}
+          </div>
+        )}
 
-      <div style={{ display: "flex", gap: 10, width: "100%" }}>
-        <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
-        <button onClick={onConfirm} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
+        <div style={{ display: "flex", gap: 10, width: "100%" }}>
+          <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
+          <button onClick={onConfirm} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
+        </div>
       </div>
     </div>
   );
@@ -546,56 +546,53 @@ function StepAction({ report, onDone, onBack }) {
 
   if (confirming) {
     return (
-      <div style={{ animation: "popin .25s ease" }}>
-        <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 14 }}>이대로 등록할까요?</div>
+      <div onClick={() => setConfirming(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflowY: "auto" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ animation: "popin .2s ease", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 18, padding: 20, width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto" }}>
+          <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 14 }}>이대로 등록할까요?</div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
-          {report && (
-            <>
-              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
-                  <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+            {report && (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                  <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
+                    <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
+                  </div>
+                  <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
+                    <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
+                  </div>
                 </div>
-                <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
-                  <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
-                </div>
-              </div>
-              {[
-                { label: "위험 유형", value: hazardLabel(report) },
-                { label: "발견 장소", value: report.location },
-                { label: "상황 설명", value: report.desc },
-              ].map((r) => (
-                <div key={r.label} style={{ display: "flex", gap: 10, padding: "6px 0" }}>
-                  <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
-                  <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
-                </div>
-              ))}
-              <div style={{ borderTop: `1px solid ${C.line}`, margin: "8px 0" }} />
-            </>
-          )}
-          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
-          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: actionPhoto ? 12 : 0 }}>{actionDesc}</p>
-          {actionPhoto && (
-            <img src={actionPhoto} alt="조치 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
-          )}
-        </div>
+                {[
+                  { label: "위험 유형", value: hazardLabel(report) },
+                  { label: "발견 장소", value: report.location },
+                  { label: "상황 설명", value: report.desc },
+                ].map((r) => (
+                  <div key={r.label} style={{ display: "flex", gap: 10, padding: "6px 0" }}>
+                    <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
+                    <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
+                  </div>
+                ))}
+                <div style={{ borderTop: `1px solid ${C.line}`, margin: "8px 0" }} />
+              </>
+            )}
+            <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
+            <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: actionPhoto ? 12 : 0 }}>{actionDesc}</p>
+            {actionPhoto && (
+              <img src={actionPhoto} alt="조치 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
+            )}
+          </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6, background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 10, padding: "8px 12px", marginBottom: 18 }}>
-          <span style={{ fontSize: 11.5 }}>⚠️</span>
-          <span style={{ fontSize: 11.5, color: C.green }}>등록 후에는 수정할 수 없어요.</span>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => setConfirming(false)} disabled={submitting} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
-            돌아가기
-          </button>
-          <button onClick={handleFinalSubmit} disabled={submitting} className="osw"
-            style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
-            {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <CircleCheck size={17} />}
-            등록할게요
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => setConfirming(false)} disabled={submitting} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
+              돌아가기
+            </button>
+            <button onClick={handleFinalSubmit} disabled={submitting} className="osw"
+              style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <CircleCheck size={17} />}
+              등록할게요
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -699,7 +696,6 @@ function ReportForm({ onSubmit }) {
   const [photoBusy, setPhotoBusy]   = useState(false);
   const [errors, setErrors]         = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false); // 제출 전 최종 확인 팝업
   const fileRef = useRef(null);
 
   const handlePhoto = async (e) => {
@@ -724,13 +720,8 @@ function ReportForm({ onSubmit }) {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    setShowConfirm(true); // 바로 제출하지 않고 최종 확인 팝업부터 띄운다
-  };
-
-  const doSubmit = async () => {
-    setShowConfirm(false);
     setSubmitting(true);
     saveMyName(name.trim());
     await onSubmit({
@@ -830,25 +821,6 @@ function ReportForm({ onSubmit }) {
         {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={16} />}
         다음으로
       </button>
-
-      {showConfirm && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 20, maxWidth: 340, width: "100%", textAlign: "center" }}>
-            <div className="osw" style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>제출 전 확인해주세요</div>
-            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, marginBottom: 18 }}>
-              제출 후에는 내용을 수정하기 어려워요.<br />작성하신 내용이 정확한지 다시 한 번 확인해주세요.
-            </p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setShowConfirm(false)} style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 0", color: C.text, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                다시 확인할게요
-              </button>
-              <button onClick={doSubmit} className="osw" style={{ flex: 1, background: C.yellow, border: "none", borderRadius: 10, padding: "11px 0", color: C.bg, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                제출할게요
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

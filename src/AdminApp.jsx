@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 
 const C = {
-  bg: "#161D27", surface: "#212B38", surfaceAlt: "#2A3646",
-  line: "#37455A", text: "#EDF1F5", muted: "#8FA0B3",
-  yellow: "#FFC845", red: "#E85D4C", blue: "#5A9BE8", green: "#4CAF7D", orange: "#E8974C",
+  bg: "#F2F8FD", surface: "#FFFFFF", surfaceAlt: "#E8F2FB",
+  line: "#D6E6F5", text: "#17293B", muted: "#5E7893",
+  yellow: "#E8A93B", red: "#E0574A", blue: "#2E8AE0", green: "#3FA372", orange: "#DB8A3F",
 };
 
 const HAZARD_TYPES = [
@@ -27,10 +27,10 @@ const HAZARD_TYPES = [
 ];
 
 const STATUS_META = {
-  pending:  { label: "조치 대기",      color: C.yellow, bg: "#FFC84522" },
-  action:   { label: "조치 진행 중",   color: C.orange, bg: "#E8974C22" },
-  done:     { label: "조치 완료",      color: C.green,  bg: "#4CAF7D22" },
-  deferred: { label: "즉시 조치 불가", color: C.red,    bg: "#E85D4C22" },
+  pending:  { label: "조치 대기",      color: C.yellow, bg: "#E8A93B22" },
+  action:   { label: "조치 진행 중",   color: C.orange, bg: "#DB8A3F22" },
+  done:     { label: "조치 완료",      color: C.green,  bg: "#3FA37222" },
+  deferred: { label: "즉시 조치 불가", color: C.red,    bg: "#E0574A22" },
 };
 
 const hazardOf = (id) => HAZARD_TYPES.find((h) => h.id === id) || HAZARD_TYPES.at(-1);
@@ -91,7 +91,7 @@ export default function AdminApp() {
         .mono { font-family: 'JetBrains Mono', monospace; }
         input, select, textarea { font-family: 'Inter', sans-serif; }
         input:focus, select:focus, textarea:focus { outline: 2px solid ${C.blue}; outline-offset: 1px; }
-        ::placeholder { color: #5C6B7E; }
+        ::placeholder { color: #9BB0C4; }
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
       `}</style>
@@ -334,7 +334,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
                   </button>
                 </div>
 
-                <p style={{ fontSize: 13, color: "#C6D0DB", marginTop: 8, lineHeight: 1.5 }}>{r.desc}</p>
+                <p style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{r.desc}</p>
 
                 {/* 조치 완료 내용 */}
                 {r.status === "done" && r.actionDesc && (

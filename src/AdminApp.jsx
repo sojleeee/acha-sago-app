@@ -114,8 +114,8 @@ export default function AdminApp() {
         <div style={{ background: C.surface, borderBottom: `3px solid ${C.blue}`, padding: "18px 16px 14px", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <ShieldCheck size={20} color={C.bg} strokeWidth={2.5} />
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                <img src="/icon-192-admin.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
               <div>
                 <div className="osw" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1, display: "flex", alignItems: "center", gap: 8 }}>
@@ -131,15 +131,16 @@ export default function AdminApp() {
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <button
                 onClick={() => registerForPush().then((res) => setPushDebug(res))}
-                style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}
+                aria-label="알림 받기"
+                style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, width: 32, height: 32, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}
               >
-                🔔 알림 받기
+                🔔
               </button>
-              <button onClick={load} style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
-                <RefreshCw size={13} /> 새로고침
+              <button onClick={load} aria-label="새로고침" style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, width: 32, height: 32, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <RefreshCw size={14} />
               </button>
             </div>
           </div>
@@ -554,8 +555,8 @@ function PinScreen({ onSuccess }) {
       `}</style>
       <div style={{ width: "100%", maxWidth: 320, animation: "fadein .3s ease" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, marginBottom: 32 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldCheck size={32} color={C.bg} />
+          <div style={{ width: 64, height: 64, borderRadius: 18, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <img src="/icon-192-admin.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
           <div style={{ textAlign: "center" }}>
             <div className="osw" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>관리자 대시보드</div>
@@ -564,8 +565,8 @@ function PinScreen({ onSuccess }) {
         </div>
 
         <div style={{ background: C.surface, borderRadius: 16, padding: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surfaceAlt, border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 12, padding: "0 16px", marginBottom: error ? 8 : 16 }}>
-            <Lock size={16} color={C.muted} />
+          <div style={{ position: "relative", background: C.surfaceAlt, border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 12, padding: "0 16px", marginBottom: error ? 8 : 16 }}>
+            <Lock size={16} color={C.muted} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)" }} />
             <input
               ref={inputRef}
               type="password"
@@ -575,7 +576,7 @@ function PinScreen({ onSuccess }) {
               onChange={(e) => { setPin(e.target.value.replace(/\D/g, "")); setError(""); }}
               onKeyDown={(e) => e.key === "Enter" && check()}
               placeholder="● ● ● ●"
-              style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 20, letterSpacing: 8, textAlign: "center", padding: "14px 0", outline: "none" }}
+              style={{ width: "100%", background: "transparent", border: "none", color: C.text, fontSize: 20, letterSpacing: 8, textAlign: "center", padding: "14px 0", outline: "none" }}
             />
           </div>
           {error && <p style={{ fontSize: 12, color: C.red, marginBottom: 12, textAlign: "center" }}>{error}</p>}

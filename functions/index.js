@@ -10,7 +10,20 @@ const db = getFirestore();
 async function sendToAdmins(report, statusLabel) {
   const tokensSnap = await db.collection("adminTokens").get();
   const tokens = tokensSnap.docs.map((d) => d.id);
-  if (tokens.length === 0) return;
+
+  // Firestore에 이번 발송 시도의 결과를 남긴다. Firestore 콘솔에서 바로 눈으로
+  // 확인할 수 있어서, Cloud Logging(로그 탐색기)보다 훨씬 확인하기 쉽다.
+  const debugRef = db.collection("_debug").doc("lastPushAttempt");
+
+  if (tokens.length === 0) {
+    await debugRef.set({
+      attemptedAt: new Date().toISOString(),
+      statusLabel,
+      tokenCount: 0,
+      note: "adminTokens 컬렉션이 비어있어서 아무것도 보내지 않음",
+    });
+    return;
+  }
 
   const hazardText = report.hazardLabel || report.hazard || "위험 상황";
   const message = {
@@ -23,26 +36,51 @@ async function sendToAdmins(report, statusLabel) {
 
   try {
     const response = await getMessaging().sendEachForMulticast(message);
+    const results = response.responses.map((r, i) => ({
+      token: tokens[i].slice(0, 12) + "...", // 토큰 전체는 길어서 앞부분만
+      success: r.success,
+      errorCode: r.error?.code || null,
+      errorMessage: r.error?.message || null,
+    }));
+
     const invalid = [];
     response.responses.forEach((r, i) => {
-      if (!r.success) {
-        invalid.push(tokens[i]);
-        // 개별 토큰 실패 사유를 반드시 로그로 남긴다 (전체 함수는 정상 종료되어
-        // catch 블록의 "알림 발송 실패" 로그가 찍히지 않으므로, 여기서 별도로 남긴다).
-        console.error(
-          "토큰 발송 실패",
-          tokens[i],
-          r.error?.code,
-          r.error?.message
-        );
+      if (!r.success) invalid.push(tokens[i]);
+    });
+
+    await debugRef.set({
+      attemptedAt: new Date().toISOString(),
+      statusLabel,
+      tokenCount: tokens.length,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      results,
+    });
+
+    // "등록되지 않은 토큰"으로 확실히 판정된 경우에만 삭제한다.
+    // 그 외 에러(예: messaging/invalid-argument, 일시적 네트워크/서버 오류,
+    // messaging/quota-exceeded 등)는 토큰 자체가 무효라는 증거가 아니므로
+    // 함부로 지우지 않는다 — 잘못 지우면 멀쩡한 기기가 알림을 영영 못 받게 됨.
+    const toDelete = [];
+    response.responses.forEach((r, i) => {
+      if (!r.success && r.error?.code === "messaging/registration-token-not-registered") {
+        toDelete.push(tokens[i]);
       }
     });
-    if (invalid.length > 0) {
-      console.log(`무효 토큰 ${invalid.length}개 삭제 처리`, invalid);
+
+    for (const t of toDelete) {
+      console.log(
+        `토큰 삭제: ${t.slice(0, 12)}... / 사유: messaging/registration-token-not-registered (기기에서 구독이 해제되어 더 이상 유효하지 않음)`
+      );
     }
-    await Promise.all(invalid.map((t) => db.collection("adminTokens").doc(t).delete()));
+    await Promise.all(toDelete.map((t) => db.collection("adminTokens").doc(t).delete()));
   } catch (e) {
-    console.error("알림 발송 실패", e);
+    await debugRef.set({
+      attemptedAt: new Date().toISOString(),
+      statusLabel,
+      tokenCount: tokens.length,
+      fatalError: `${e?.code || ""} ${e?.message || e}`,
+    });
   }
 }
 

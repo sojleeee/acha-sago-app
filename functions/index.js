@@ -101,11 +101,30 @@ exports.notifyOnStatusChange = onDocumentUpdated(
 
     if (before.status === after.status) return;
 
-    if (after.status === "deferred" && before.status !== "deferred") {
-      await sendToAdmins(after, "즉시 조치 불가");
-    } else if (after.status === "done" && before.status !== "done") {
-      await sendToAdmins(after, "조치 완료");
+    const shouldNotify = after.status === "deferred" || after.status === "done";
+    if (!shouldNotify) return;
+    const statusLabel = after.status === "deferred" ? "즉시 조치 불가" : "조치 완료";
+
+    // Firestore 트리거는 "최소 1번" 전달을 보장할 뿐, 정확히 1번을 보장하지 않는다.
+    // 네트워크 재시도 등으로 같은 이벤트가 시간차를 두고 두 번 실행될 수 있어서,
+    // 이미 이 "쓰기 이벤트"에 대해 알림을 보낸 적이 있으면 건너뛴다.
+    // status 값이 아니라 이 쓰기 자체의 고유 시각(updateTime)으로 비교해야,
+    // "완료→취소→다시 완료" 같은 정당한 재발생까지 막아버리지 않는다.
+    const reportRef = event.data.after.ref;
+    const writeTimeISO = event.data.after.updateTime.toDate().toISOString();
+    const alreadySent = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(reportRef);
+      const data = snap.data();
+      if (data?.lastNotifiedWriteTime === writeTimeISO) return true; // 같은 이벤트 재전달
+      tx.update(reportRef, { lastNotifiedWriteTime: writeTimeISO });
+      return false;
+    });
+    if (alreadySent) {
+      console.log(`중복 트리거 감지 - ${statusLabel} 알림 재전송 건너뜀 (reportId: ${event.params.reportId})`);
+      return;
     }
+
+    await sendToAdmins(after, statusLabel);
   }
 );
 

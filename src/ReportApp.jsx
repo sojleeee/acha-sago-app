@@ -699,6 +699,7 @@ function ReportForm({ onSubmit }) {
   const [photoBusy, setPhotoBusy]   = useState(false);
   const [errors, setErrors]         = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false); // 제출 전 최종 확인 팝업
   const fileRef = useRef(null);
 
   const handlePhoto = async (e) => {
@@ -723,8 +724,13 @@ function ReportForm({ onSubmit }) {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!validate()) return;
+    setShowConfirm(true); // 바로 제출하지 않고 최종 확인 팝업부터 띄운다
+  };
+
+  const doSubmit = async () => {
+    setShowConfirm(false);
     setSubmitting(true);
     saveMyName(name.trim());
     await onSubmit({
@@ -824,6 +830,25 @@ function ReportForm({ onSubmit }) {
         {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={16} />}
         다음으로
       </button>
+
+      {showConfirm && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 20, maxWidth: 340, width: "100%", textAlign: "center" }}>
+            <div className="osw" style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>제출 전 확인해주세요</div>
+            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, marginBottom: 18 }}>
+              제출 후에는 내용을 수정하기 어려워요.<br />작성하신 내용이 정확한지 다시 한 번 확인해주세요.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setShowConfirm(false)} style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 0", color: C.text, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                다시 확인할게요
+              </button>
+              <button onClick={doSubmit} className="osw" style={{ flex: 1, background: C.yellow, border: "none", borderRadius: 10, padding: "11px 0", color: C.bg, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                제출할게요
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -79,12 +79,16 @@ export async function registerForPush() {
     // 포그라운드에서 알림이 여러 번 뜬다.
     if (!foregroundListenerRegistered) {
       foregroundListenerRegistered = true;
-      onMessage(messaging, (payload) => {
-        // 앱이 켜져있을 때(포그라운드) 온 알림도 표시
+      onMessage(messaging, async (payload) => {
+        // 앱이 켜져있을 때(포그라운드) 온 알림도 표시.
+        // new Notification()은 안드로이드 크롬에서 페이지 코드가 직접 호출하는 걸
+        // 지원하지 않는다(조용히 실패함) — 반드시 서비스 워커의 showNotification()을
+        // 써야 아이폰/안드로이드 둘 다에서 동작한다.
         const title = payload.notification?.title || "아차사고 발굴";
         const body = payload.notification?.body || "새 신고가 접수되었습니다.";
         if (Notification.permission === "granted") {
-          new Notification(title, { body, icon: "/icon-192.png" });
+          const reg = await navigator.serviceWorker.ready;
+          reg.showNotification(title, { body, icon: "/icon-192.png" });
         }
       });
     }

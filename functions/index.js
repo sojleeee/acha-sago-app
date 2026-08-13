@@ -25,8 +25,21 @@ async function sendToAdmins(report, statusLabel) {
     const response = await getMessaging().sendEachForMulticast(message);
     const invalid = [];
     response.responses.forEach((r, i) => {
-      if (!r.success) invalid.push(tokens[i]);
+      if (!r.success) {
+        invalid.push(tokens[i]);
+        // 개별 토큰 실패 사유를 반드시 로그로 남긴다 (전체 함수는 정상 종료되어
+        // catch 블록의 "알림 발송 실패" 로그가 찍히지 않으므로, 여기서 별도로 남긴다).
+        console.error(
+          "토큰 발송 실패",
+          tokens[i],
+          r.error?.code,
+          r.error?.message
+        );
+      }
     });
+    if (invalid.length > 0) {
+      console.log(`무효 토큰 ${invalid.length}개 삭제 처리`, invalid);
+    }
     await Promise.all(invalid.map((t) => db.collection("adminTokens").doc(t).delete()));
   } catch (e) {
     console.error("알림 발송 실패", e);

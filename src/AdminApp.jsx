@@ -102,6 +102,12 @@ export default function AdminApp() {
           <button onClick={() => setPushDebug(null)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>✕</button>
         </div>
       )}
+      {pushDebug && pushDebug.ok && (
+        <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.green, color: "#fff", padding: "10px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span>🔔 알림 등록 성공! 이 기기로 알림을 받을 수 있어요.</span>
+          <button onClick={() => setPushDebug(null)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
 
       <div style={{ maxWidth: 440, margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         {/* 헤더 */}
@@ -125,9 +131,17 @@ export default function AdminApp() {
                 </div>
               </div>
             </div>
-            <button onClick={load} style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
-              <RefreshCw size={13} /> 새로고침
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                onClick={() => registerForPush().then((res) => setPushDebug(res))}
+                style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}
+              >
+                🔔 알림 받기
+              </button>
+              <button onClick={load} style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+                <RefreshCw size={13} /> 새로고침
+              </button>
+            </div>
           </div>
         </div>
 

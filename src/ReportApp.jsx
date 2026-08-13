@@ -425,7 +425,7 @@ function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, o
 function StepChoose({ onChoose, onBack }) {
   return (
     <div style={{ animation: "popin .25s ease" }}>
-      <button onClick={onBack} style={{ background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← 발견으로 돌아가기</button>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: C.surface, border: `1.5px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 16, padding: "8px 14px" }}>← 발견으로 돌아가기</button>
       <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>위험요소를 바로 조치할 수 있나요?</div>
       <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>현장에서 바로 위험 요소를 제거하거나 조치할 수 있는지 선택해주세요.</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -635,7 +635,7 @@ function StepAction({ report, onDone, onBack }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadein .25s ease" }}>
-      <button onClick={onBack} style={{ background: "transparent", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", padding: 0, textAlign: "left" }}>← 조치 선택으로 돌아가기</button>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: C.surface, border: `1.5px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 14px", alignSelf: "flex-start" }}>← 조치 선택으로 돌아가기</button>
 
       <div style={{ display: "flex", justifyContent: "center" }}>
         <img src="/icon-action.png" alt="" style={{ width: 150, height: 150, objectFit: "contain" }} />

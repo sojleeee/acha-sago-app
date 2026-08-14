@@ -639,7 +639,6 @@ function PinScreen({ onSuccess }) {
         <div style={{ width: "100%", maxWidth: 320, animation: "fadein .3s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>소속 부서를 선택해주세요</div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>선택한 부서로 배정된 신고 알림을 받게 돼요.<br />(안전환경실은 모든 신고 알림을 받아요)</div>
           </div>
           <div style={{ background: C.surface, borderRadius: 16, padding: 24 }}>
             <select

@@ -89,7 +89,7 @@ export default function AdminApp() {
   const updateReport = (id, patch) => fbUpdateReport(id, patch);
   const load = () => setLastLoaded(new Date());
 
-  const newCount = reports.filter((r) => !r.deleted && r.status === "deferred").length;
+  const newCount = reports.filter((r) => !r.deleted && r.status === "deferred" && (getAdminDept() === HEAD_DEPT || r.assignedDept === getAdminDept())).length;
   const trashCount = reports.filter((r) => r.deleted).length;
 
   if (!authed) return <PinScreen onSuccess={() => setAuthed(true)} />;
@@ -168,7 +168,7 @@ export default function AdminApp() {
               <span style={{ fontSize: 13 }}>불러오는 중…</span>
             </div>
           ) : tab === "list"
-            ? <ReportList reports={reports.filter((r) => !r.deleted && r.status !== "pending")} onDelete={deleteReport} onUpdate={updateReport} />
+            ? <ReportList reports={reports.filter((r) => !r.deleted && r.status !== "pending" && (getAdminDept() === HEAD_DEPT || r.assignedDept === getAdminDept()))} onDelete={deleteReport} onUpdate={updateReport} />
             : tab === "trash"
             ? <TrashList reports={reports.filter((r) => r.deleted)} onRestore={restoreReport} onPermanentDelete={permanentlyDelete} />
             : <Ranking reports={reports.filter((r) => !r.deleted)} />

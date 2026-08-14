@@ -42,10 +42,18 @@ function getDeviceId() {
   return id;
 }
 
+// 이 관리자 기기가 어느 부서 소속인지 (최초 1회 선택 후 계속 재사용)
+export function getAdminDept() {
+  return localStorage.getItem("acha-admin-dept") || "";
+}
+export function setAdminDept(dept) {
+  localStorage.setItem("acha-admin-dept", dept);
+}
+
 // ── 푸시 알림(FCM) ──────────────────────────────────
 let foregroundListenerRegistered = false; // onMessage 리스너 중복 등록 방지용
 
-export async function registerForPush() {
+export async function registerForPush(dept) {
   try {
     const supported = await isSupported();
     if (!supported) return { ok: false, reason: "이 브라우저는 푸시 알림을 지원하지 않아요." };
@@ -72,6 +80,7 @@ export async function registerForPush() {
     const deviceId = getDeviceId();
     await setDoc(doc(db, "adminTokens", deviceId), {
       token,
+      dept: dept || getAdminDept() || "",
       updatedAt: new Date().toISOString(),
     });
     // registerForPush()가 여러 번 호출돼도(자동 실행 + "알림 받기" 버튼 클릭 등)

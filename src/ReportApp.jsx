@@ -51,6 +51,16 @@ const HAZARD_TYPES = [
   { id: "etc",      label: "📋 기타",                  color: C.muted },
 ];
 
+// 즉시 조치 불가 시 담당(개선) 부서 선택지
+const DEPT_LIST = [
+  "감사실", "안전환경실", "ESG전략실", "홍보비서실",
+  "기획조정처", "경영지원처",
+  "매립시설처", "매립운영처", "물환경처",
+  "자원사업처", "탄소사업처", "에너지사업처",
+  "지역상생처", "체육공원처",
+  "기술정보처", "연구분석처",
+];
+
 const hazardOf    = (id) => HAZARD_TYPES.find((h) => h.id === id) || HAZARD_TYPES.at(-1);
 const hazardLabel = (r)  => (r.hazard === "etc" && r.hazardLabel) ? r.hazardLabel : hazardOf(r.hazard).label;
 
@@ -144,8 +154,8 @@ export default function ReportApp() {
     setFlow((f) => ({ ...f, step: "done" }));
   };
 
-  const handleDeferred = async () => {
-    await updateReport(currentId, { status: "deferred" });
+  const handleDeferred = async (assignedDept) => {
+    await updateReport(currentId, { status: "deferred", assignedDept });
     setFlow((f) => ({ ...f, step: "deferred" }));
   };
 
@@ -462,11 +472,18 @@ function StepChoose({ onChoose, onBack }) {
 function StepConfirmDefer({ report, onConfirm, onBack }) {
   const [showWarn, setShowWarn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [assignedDept, setAssignedDept] = useState("");
+  const [deptError, setDeptError] = useState(false);
 
   const doConfirm = async () => {
     setSubmitting(true);
-    await onConfirm();
+    await onConfirm(assignedDept);
     setSubmitting(false);
+  };
+
+  const handleRequestClick = () => {
+    if (!assignedDept) { setDeptError(true); return; }
+    setShowWarn(true);
   };
 
   return (
@@ -496,6 +513,7 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
             { label: "발견 일시", value: fmtDateTime(report.occurredAt) },
             { label: "발견 장소", value: report.location },
             { label: "상황 설명", value: report.desc },
+            ...(assignedDept ? [{ label: "요청 부서", value: assignedDept }] : []),
           ].map((r, i, arr) => (
             <div key={r.label} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
               <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
@@ -510,9 +528,22 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
         </div>
       )}
 
+      <div style={{ width: "100%", textAlign: "left" }}>
+        <label style={{ display: "block", fontSize: 12.5, color: C.text, fontWeight: 600, marginBottom: 6 }}>어느 부서의 도움이 필요할까요?</label>
+        <select
+          value={assignedDept}
+          onChange={(e) => { setAssignedDept(e.target.value); setDeptError(false); }}
+          style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${deptError ? C.red : C.line}`, borderRadius: 10, padding: "12px 14px", fontSize: 14, color: assignedDept ? C.text : C.muted, outline: "none" }}
+        >
+          <option value="">부서를 선택하세요</option>
+          {DEPT_LIST.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+        {deptError && <div style={{ fontSize: 11.5, color: C.red, marginTop: 5 }}>부서를 선택해주세요.</div>}
+      </div>
+
       <div style={{ display: "flex", gap: 10, width: "100%" }}>
         <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
-        <button onClick={() => setShowWarn(true)} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
+        <button onClick={handleRequestClick} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
       </div>
 
       {showWarn && (

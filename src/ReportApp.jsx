@@ -735,6 +735,7 @@ function ReportForm({ onSubmit }) {
   const [photoBusy, setPhotoBusy]   = useState(false);
   const [errors, setErrors]         = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [consent, setConsent]       = useState(false);
   const fileRef = useRef(null);
 
   const handlePhoto = async (e) => {
@@ -755,6 +756,7 @@ function ReportForm({ onSubmit }) {
     if (!desc.trim())          e.desc       = "필수 작성입니다.";
     if (!photo)                e.photo      = "필수 작성입니다.";
     if (hazard === "etc" && !etcLabel.trim()) e.etcLabel = "필수 작성입니다.";
+    if (!consent)              e.consent    = "동의가 필요합니다.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -775,6 +777,7 @@ function ReportForm({ onSubmit }) {
     setHazard(HAZARD_TYPES[0].id); setEtcLabel("");
     setOccurredAt(nowLocalInput()); setLocation("");
     setDept(""); setName(""); setDesc(""); setPhoto(null);
+    setConsent(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -854,6 +857,19 @@ function ReportForm({ onSubmit }) {
         )}
         <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
       </Field>
+
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, background: C.surfaceAlt, border: `1px solid ${errors.consent ? C.red : C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: undefined })); }}
+          style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16, accentColor: C.blue, cursor: "pointer" }}
+        />
+        <span style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          [개인정보 수집·이용 동의 문구 자리 — 추후 작성 예정]
+        </span>
+      </label>
+      {errors.consent && <span style={{ fontSize: 11.5, color: C.red, marginTop: -10 }}>{errors.consent}</span>}
 
       <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"
         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting || photoBusy ? 0.7 : 1, marginTop: 4 }}>

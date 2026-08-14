@@ -7,13 +7,23 @@ const { getMessaging } = require("firebase-admin/messaging");
 initializeApp();
 const db = getFirestore();
 
-async function sendToAdmins(report, statusLabel) {
+const HEAD_DEPT = "안전환경실"; // 부서 상관없이 항상 모든 알림을 받는 총괄 부서
+
+// allowedDepts: null이면 전체 관리자에게, 배열이면 그 부서(+안전환경실)에게만 보낸다.
+async function sendToAdmins(report, statusLabel, allowedDepts = null) {
   const tokensSnap = await db.collection("adminTokens").get();
   // 문서 ID(d.id)는 기기 식별용 deviceId일 뿐, FCM에 보낼 실제 토큰이 아니다.
   // 실제 토큰은 문서 안 "token" 필드에 저장돼 있다 — 이 구분을 놓치면
   // FCM이 "messaging/invalid-argument"로 매번 거부한다.
-  const deviceIds = tokensSnap.docs.map((d) => d.id);
-  const tokens = tokensSnap.docs.map((d) => d.data().token);
+  let docs = tokensSnap.docs;
+
+  if (allowedDepts) {
+    const targets = new Set([...allowedDepts, HEAD_DEPT]);
+    docs = docs.filter((d) => targets.has(d.data().dept));
+  }
+
+  const deviceIds = docs.map((d) => d.id);
+  const tokens = docs.map((d) => d.data().token);
 
   // Firestore에 이번 발송 시도의 결과를 남긴다. Firestore 콘솔에서 바로 눈으로
   // 확인할 수 있어서, Cloud Logging(로그 탐색기)보다 훨씬 확인하기 쉽다.
@@ -23,8 +33,9 @@ async function sendToAdmins(report, statusLabel) {
     await debugRef.set({
       attemptedAt: new Date().toISOString(),
       statusLabel,
+      allowedDepts,
       tokenCount: 0,
-      note: "adminTokens 컬렉션이 비어있어서 아무것도 보내지 않음",
+      note: "조건에 맞는 관리자가 없어서 아무것도 보내지 않음",
     });
     return;
   }
@@ -124,7 +135,14 @@ exports.notifyOnStatusChange = onDocumentUpdated(
       return;
     }
 
-    await sendToAdmins(after, statusLabel);
+    // "즉시 조치 불가"는 배정된 부서(+안전환경실)에게만, "조치 완료"는
+    // 안전환경실에게만 보낸다. (즉시 조치 불가인데 부서 미배정이면 전체 발송으로 fallback)
+    const allowedDepts =
+      after.status === "done" ? [HEAD_DEPT]
+      : after.assignedDept ? [after.assignedDept]
+      : null;
+
+    await sendToAdmins(after, statusLabel, allowedDepts);
   }
 );
 

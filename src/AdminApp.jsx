@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import {
   ClipboardList, Trophy, Camera, MapPin, User,
   Trash2, X, Loader2, Award, Medal, Sprout, ImageOff,
-  ShieldCheck, RefreshCw, KeyRound, Lock, Search, Download, Calendar, SlidersHorizontal
+  ShieldCheck, RefreshCw, KeyRound, Lock, Search, Download, Calendar, SlidersHorizontal, ChevronRight
 } from "lucide-react";
 
 const C = {
@@ -190,13 +190,13 @@ export default function AdminApp() {
 /* ════════════════════════════ 신고 목록 ════════════════════════════ */
 function ReportList({ reports, onDelete, onUpdate }) {
   const [statusFilter, setStatusFilter] = useState("all"); // all | progress | deferred | done
-  const [photoView, setPhotoView]   = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
   const [hazardFilter, setHazardFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedId, setSelectedId] = useState(null); // 탭한 신고의 상세 페이지로 전환
 
   let filtered = reports;
   if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "action");
@@ -243,6 +243,11 @@ function ReportList({ reports, onDelete, onUpdate }) {
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `아차사고_발견현황_${today}.xlsx`);
   };
+
+  const selectedReport = selectedId ? reports.find((r) => r.id === selectedId) : null;
+  if (selectedReport) {
+    return <ReportDetailPage report={selectedReport} onBack={() => setSelectedId(null)} onDelete={onDelete} />;
+  }
 
   return (
     <div style={{ animation: "fadein .3s ease" }}>
@@ -318,62 +323,100 @@ function ReportList({ reports, onDelete, onUpdate }) {
             const h  = hazardOf(r.hazard);
             const st = STATUS_META[r.status] || STATUS_META.pending;
             return (
-              <div key={r.id} style={{ background: C.surface, borderRadius: 12, padding: 12, borderLeft: `4px solid ${h.color}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 700, color: h.color }}>{hazardLabel(r)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: st.color, background: st.bg, padding: "2px 8px", borderRadius: 20 }}>{st.label}</span>
-                    </div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-                      <MapPin size={12} color={C.muted} /> {r.location}
-                    </div>
-                    <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{fmtDateTime(r.occurredAt)}</div>
+              <button
+                key={r.id}
+                onClick={() => setSelectedId(r.id)}
+                style={{ width: "100%", textAlign: "left", background: C.surface, border: `1px solid ${C.line}`, borderLeft: `4px solid ${h.color}`, borderRadius: 12, padding: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: h.color }}>{hazardLabel(r)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: st.color, background: st.bg, padding: "2px 8px", borderRadius: 20 }}>{st.label}</span>
                   </div>
-                  <button onClick={() => setConfirmDel(r.id)} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}>
-                    <Trash2 size={15} />
-                  </button>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
+                    <MapPin size={12} color={C.muted} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                    <User size={11} style={{ flexShrink: 0 }} /> {r.dept ? `${r.dept} · ` : ""}{r.reporterName}
+                  </div>
                 </div>
-
-                <p style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{r.desc}</p>
-
-                {/* 조치 완료 내용 */}
-                {r.status === "done" && r.actionDesc && (
-                  <div style={{ marginTop: 10, background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 8, padding: 10 }}>
-                    <div style={{ fontSize: 11.5, color: C.green, fontWeight: 600, marginBottom: 4 }}>✓ 조치 완료 내용</div>
-                    <p style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{r.actionDesc}</p>
-                    {r.actionAt && <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{fmtDateTime(r.actionAt)}</div>}
-                    {r.actionPhoto && (
-                      <button onClick={() => setPhotoView(r.actionPhoto)} style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", color: C.green, fontSize: 11.5, cursor: "pointer", marginTop: 6 }}>
-                        <Camera size={12} /> 조치 사진 보기
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-                  <span style={{ fontSize: 11.5, color: C.muted, display: "flex", alignItems: "center", gap: 4 }}>
-                    <User size={11} /> {r.dept ? `${r.dept} · ` : ""}{r.reporterName}
-                  </span>
-                  {r.photo && (
-                    <button onClick={() => setPhotoView(r.photo)} style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", color: C.blue, fontSize: 11.5, cursor: "pointer" }}>
-                      <Camera size={12} /> 발견 사진
-                    </button>
-                  )}
-                </div>
-
-                {confirmDel === r.id && (
-                  <div style={{ marginTop: 10, background: C.surfaceAlt, borderRadius: 8, padding: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 12, color: C.muted }}>이 발견을 삭제할까요?</span>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => setConfirmDel(null)} style={{ fontSize: 12, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>취소</button>
-                      <button onClick={() => { onDelete(r.id); setConfirmDel(null); }} style={{ fontSize: 12, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>삭제</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                <ChevronRight size={18} color={C.muted} style={{ flexShrink: 0 }} />
+              </button>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── 신고 상세 페이지 ── */
+function ReportDetailPage({ report, onBack, onDelete }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [photoView, setPhotoView]   = useState(null);
+  const h  = hazardOf(report.hazard);
+  const st = STATUS_META[report.status] || STATUS_META.pending;
+
+  return (
+    <div style={{ animation: "fadein .2s ease" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: C.surface, border: `1.5px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 14px", marginBottom: 14 }}>
+        ← 목록으로
+      </button>
+
+      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderLeft: `4px solid ${h.color}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: h.color }}>{hazardLabel(report)}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: st.color, background: st.bg, padding: "3px 10px", borderRadius: 20 }}>{st.label}</span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <DetailRow icon={MapPin} label="발견 장소" value={report.location || "-"} />
+          <DetailRow icon={Calendar} label="발견 일시" value={fmtDateTime(report.occurredAt) || "-"} />
+          <DetailRow icon={User} label="신고자" value={`${report.dept ? report.dept + " · " : ""}${report.reporterName || "-"}`} />
+        </div>
+
+        <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 14, paddingTop: 14 }}>
+          <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>상황 설명</div>
+          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6 }}>{report.desc || "-"}</p>
+        </div>
+
+        {report.photo && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>발견 사진</div>
+            <img
+              src={report.photo} alt="발견 사진" onClick={() => setPhotoView(report.photo)}
+              style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}`, cursor: "pointer" }}
+            />
+          </div>
+        )}
+      </div>
+
+      {report.status === "done" && report.actionDesc && (
+        <div style={{ background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, color: C.green, fontWeight: 700, marginBottom: 8 }}>✓ 조치 완료 내용</div>
+          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: report.actionAt || report.actionPhoto ? 10 : 0 }}>{report.actionDesc}</p>
+          {report.actionAt && <div className="mono" style={{ fontSize: 11.5, color: C.muted, marginBottom: report.actionPhoto ? 10 : 0 }}>{fmtDateTime(report.actionAt)}</div>}
+          {report.actionPhoto && (
+            <img
+              src={report.actionPhoto} alt="조치 사진" onClick={() => setPhotoView(report.actionPhoto)}
+              style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.green}40`, cursor: "pointer" }}
+            />
+          )}
+        </div>
+      )}
+
+      {!confirmDel ? (
+        <button onClick={() => setConfirmDel(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "transparent", border: `1.5px solid ${C.red}`, borderRadius: 12, padding: "12px 0", color: C.red, cursor: "pointer", fontSize: 13.5, fontWeight: 600 }}>
+          <Trash2 size={14} /> 삭제하기
+        </button>
+      ) : (
+        <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: C.muted }}>이 발견을 삭제할까요?</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setConfirmDel(false)} style={{ fontSize: 12.5, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}>취소</button>
+            <button onClick={() => { onDelete(report.id); onBack(); }} style={{ fontSize: 12.5, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}>삭제</button>
+          </div>
         </div>
       )}
 
@@ -385,6 +428,18 @@ function ReportList({ reports, onDelete, onUpdate }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function DetailRow({ icon: Icon, label, value }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <Icon size={14} color={C.muted} style={{ marginTop: 2, flexShrink: 0 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginTop: 1, wordBreak: "break-word" }}>{value}</div>
+      </div>
     </div>
   );
 }

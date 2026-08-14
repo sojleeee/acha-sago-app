@@ -492,8 +492,8 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
         <img src="/icon-confirm.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
-        <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>담당자에게 조치를 요청할까요?</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>등록한 위험요소가 담당자에게 전달됩니다.</p>
+        <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>어느 부서에 조치를 요청할까요?</div>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>위험요소를 개선할 부서를 선택해 주세요.</p>
       </div>
 
       {report && (
@@ -528,8 +528,8 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
         </div>
       )}
 
-      <div style={{ width: "100%", textAlign: "left" }}>
-        <label style={{ display: "block", fontSize: 12.5, color: C.text, fontWeight: 600, marginBottom: 6 }}>어느 부서의 도움이 필요할까요?</label>
+      <div style={{ width: "100%", textAlign: "left", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <label style={{ display: "block", fontSize: 12.5, color: C.text, fontWeight: 600, marginBottom: 8 }}>어느 부서의 도움이 필요할까요?</label>
         <select
           value={assignedDept}
           onChange={(e) => { setAssignedDept(e.target.value); setDeptError(false); }}

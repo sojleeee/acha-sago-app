@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDeleteReport, registerForPush } from "./firebase";
+import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDeleteReport, registerForPush, getAdminDept, setAdminDept } from "./firebase";
 import * as XLSX from "xlsx";
 import {
   ClipboardList, Trophy, Camera, MapPin, User,
@@ -25,6 +25,18 @@ const HAZARD_TYPES = [
   { id: "env",      label: "🚧 작업환경",              color: "#C77D4C" },
   { id: "etc",      label: "📋 기타",                  color: C.muted },
 ];
+
+// 관리자 부서 선택지 (신고자 앱과 동일). "안전환경실"은 전체 총괄 부서라
+// 어느 신고에 배정됐든 상관없이 모든 알림을 받는다.
+const DEPT_LIST = [
+  "감사실", "안전환경실", "ESG전략실", "홍보비서실",
+  "기획조정처", "경영지원처",
+  "매립시설처", "매립운영처", "물환경처",
+  "자원사업처", "탄소사업처", "에너지사업처",
+  "지역상생처", "체육공원처",
+  "기술정보처", "연구분석처",
+];
+const HEAD_DEPT = "안전환경실";
 
 const STATUS_META = {
   pending:  { label: "조치 대기",      color: C.yellow, bg: "#E8A93B22" },
@@ -67,7 +79,7 @@ export default function AdminApp() {
       setLastLoaded(new Date());
       setLoading(false);
     });
-    registerForPush().then((res) => setPushDebug(res));
+    registerForPush(getAdminDept()).then((res) => setPushDebug(res));
     return () => unsubscribe();
   }, [authed]);
 
@@ -133,7 +145,7 @@ export default function AdminApp() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <button
-                onClick={() => registerForPush().then((res) => setPushDebug(res))}
+                onClick={() => registerForPush(getAdminDept()).then((res) => setPushDebug(res))}
                 aria-label="알림 받기"
                 style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, width: 32, height: 32, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}
               >
@@ -374,6 +386,7 @@ function ReportDetailPage({ report, onBack, onDelete }) {
           <DetailRow icon={MapPin} label="발견 장소" value={report.location || "-"} />
           <DetailRow icon={Calendar} label="발견 일시" value={fmtDateTime(report.occurredAt) || "-"} />
           <DetailRow icon={User} label="신고자" value={`${report.dept ? report.dept + " · " : ""}${report.reporterName || "-"}`} />
+          {report.assignedDept && <DetailRow icon={ClipboardList} label="요청 부서" value={report.assignedDept} />}
         </div>
 
         <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 14, paddingTop: 14 }}>
@@ -594,13 +607,57 @@ function Ranking({ reports }) {
 function PinScreen({ onSuccess }) {
   const [pin, setPin]     = useState("");
   const [error, setError] = useState("");
+  const [needsDept, setNeedsDept] = useState(false); // PIN 통과했지만 부서 선택이 아직 없는 경우
+  const [dept, setDept]   = useState("");
+  const [deptError, setDeptError] = useState(false);
   const inputRef = useRef(null);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
 
   const check = () => {
-    if (pin === ADMIN_PIN) onSuccess();
-    else { setError("PIN이 올바르지 않습니다."); setPin(""); }
+    if (pin !== ADMIN_PIN) { setError("PIN이 올바르지 않습니다."); setPin(""); return; }
+    if (getAdminDept()) { onSuccess(); return; }
+    setNeedsDept(true);
   };
+
+  const confirmDept = () => {
+    if (!dept) { setDeptError(true); return; }
+    setAdminDept(dept);
+    onSuccess();
+  };
+
+  if (needsDept) {
+    return (
+      <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Inter:wght@400;500;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .osw { font-family: 'Oswald', sans-serif; }
+          @keyframes fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        `}</style>
+        <div style={{ width: "100%", maxWidth: 320, animation: "fadein .3s ease" }}>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>소속 부서를 선택해주세요</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>선택한 부서로 배정된 신고 알림을 받게 돼요.<br />(안전환경실은 모든 신고 알림을 받아요)</div>
+          </div>
+          <div style={{ background: C.surface, borderRadius: 16, padding: 24 }}>
+            <select
+              value={dept}
+              onChange={(e) => { setDept(e.target.value); setDeptError(false); }}
+              style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${deptError ? C.red : C.line}`, borderRadius: 12, padding: "13px 14px", fontSize: 15, color: dept ? C.text : C.muted, outline: "none", marginBottom: deptError ? 8 : 16 }}
+            >
+              <option value="">부서를 선택하세요</option>
+              {DEPT_LIST.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            {deptError && <p style={{ fontSize: 12, color: C.red, marginBottom: 12, textAlign: "center" }}>부서를 선택해주세요.</p>}
+            <button onClick={confirmDept} className="osw"
+              style={{ width: "100%", padding: "13px 0", background: C.blue, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700 }}>
+              완료
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>

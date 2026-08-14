@@ -470,20 +470,20 @@ function StepChoose({ onChoose, onBack }) {
 
 /* ── 즉시 조치 불가 확인 모달 ── */
 function StepConfirmDefer({ report, onConfirm, onBack }) {
-  const [showWarn, setShowWarn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [assignedDept, setAssignedDept] = useState("");
   const [deptError, setDeptError] = useState(false);
+  const [showWarn, setShowWarn] = useState(false);
+
+  const handleRequestClick = () => {
+    if (!assignedDept) { setDeptError(true); return; }
+    setShowWarn(true);
+  };
 
   const doConfirm = async () => {
     setSubmitting(true);
     await onConfirm(assignedDept);
     setSubmitting(false);
-  };
-
-  const handleRequestClick = () => {
-    if (!assignedDept) { setDeptError(true); return; }
-    setShowWarn(true);
   };
 
   return (
@@ -494,6 +494,19 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
       <div>
         <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>어느 부서에 조치를 요청할까요?</div>
         <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>위험요소를 개선할 부서를 선택해 주세요.</p>
+      </div>
+
+      <div style={{ width: "100%", textAlign: "left", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <label style={{ display: "block", fontSize: 12.5, color: C.text, fontWeight: 600, marginBottom: 8 }}>어느 부서의 도움이 필요할까요?</label>
+        <select
+          value={assignedDept}
+          onChange={(e) => { setAssignedDept(e.target.value); setDeptError(false); }}
+          style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${deptError ? C.red : C.line}`, borderRadius: 10, padding: "12px 14px", fontSize: 14, color: assignedDept ? C.text : C.muted, outline: "none" }}
+        >
+          <option value="">부서를 선택하세요</option>
+          {DEPT_LIST.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+        {deptError && <div style={{ fontSize: 11.5, color: C.red, marginTop: 5 }}>부서를 선택해주세요.</div>}
       </div>
 
       {report && (
@@ -528,19 +541,6 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
         </div>
       )}
 
-      <div style={{ width: "100%", textAlign: "left", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-        <label style={{ display: "block", fontSize: 12.5, color: C.text, fontWeight: 600, marginBottom: 8 }}>어느 부서의 도움이 필요할까요?</label>
-        <select
-          value={assignedDept}
-          onChange={(e) => { setAssignedDept(e.target.value); setDeptError(false); }}
-          style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${deptError ? C.red : C.line}`, borderRadius: 10, padding: "12px 14px", fontSize: 14, color: assignedDept ? C.text : C.muted, outline: "none" }}
-        >
-          <option value="">부서를 선택하세요</option>
-          {DEPT_LIST.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-        {deptError && <div style={{ fontSize: 11.5, color: C.red, marginTop: 5 }}>부서를 선택해주세요.</div>}
-      </div>
-
       <div style={{ display: "flex", gap: 10, width: "100%" }}>
         <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
         <button onClick={handleRequestClick} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
@@ -550,7 +550,6 @@ function StepConfirmDefer({ report, onConfirm, onBack }) {
         <div onClick={() => !submitting && setShowWarn(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 16, padding: 22, width: "100%", maxWidth: 320, animation: "popin .2s ease", textAlign: "center" }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-            <div className="osw" style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>경고: 수정할 수 없어요</div>
             <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>요청 후에는 취소하거나 수정할 수 없어요.<br />정말 요청하시겠어요?</p>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setShowWarn(false)} disabled={submitting} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>
@@ -653,7 +652,6 @@ function StepAction({ report, onDone, onBack }) {
           <div onClick={() => !submitting && setShowWarn(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 16, padding: 22, width: "100%", maxWidth: 320, animation: "popin .2s ease", textAlign: "center" }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-              <div className="osw" style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>경고: 수정할 수 없어요</div>
               <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>등록 후에는 수정할 수 없어요.<br />정말 등록하시겠어요?</p>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowWarn(false)} disabled={submitting} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>

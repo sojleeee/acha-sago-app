@@ -139,6 +139,8 @@ export default function AdminApp() {
                   )}
                 </div>
                 <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                  {getAdminDept() || "부서 미선택"}
+                  {" · "}
                   {lastLoaded ? `${lastLoaded.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} 업데이트` : "로딩 중…"}
                 </div>
               </div>

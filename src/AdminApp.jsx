@@ -649,17 +649,16 @@ function Chip({ active, onClick, label, color }) {
 function Ranking({ reports }) {
   const named = reports.filter((r) => r.reporterName);
 
-  // 신고자별 집계 — 신고만 한 건 1점, 조치완료까지 한 건 3점
+  // 신고자별 집계 — 신고만 한 건 1점, "본인이 직접" 조치완료까지 한 건 3점.
+  // 즉시조치불가로 담당 부서에 넘긴 건은, 나중에 부서가 완료 처리해도
+  // 신고자 본인이 한 게 아니므로 1점(신고만)으로 고정한다.
   const map = {};
   named.forEach((r) => {
     if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0, score: 0 };
     map[r.reporterName].total += 1;
-    if (r.status === "done") {
-      map[r.reporterName].done += 1;
-      map[r.reporterName].score += 3;
-    } else {
-      map[r.reporterName].score += 1;
-    }
+    const selfCompleted = r.status === "done" && !r.assignedDept;
+    if (r.status === "done") map[r.reporterName].done += 1;
+    map[r.reporterName].score += selfCompleted ? 3 : 1;
   });
   const ranked = Object.values(map).sort((a, b) => b.score - a.score || b.done - a.done);
 

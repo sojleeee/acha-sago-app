@@ -327,7 +327,7 @@ function MyRank() {
     })();
   }, []);
 
-  const named = reports.filter((r) => r.reporterName);
+  const named = reports.filter((r) => r.reporterName && !r.deleted);
 
   const map = {};
   named.forEach((r) => {

@@ -1,42 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport, getAllReports } from "./firebase";
+import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDeleteReport, registerForPush, getAdminDept, setAdminDept } from "./firebase";
+import * as XLSX from "xlsx";
 import {
-  AlertTriangle, Camera, MapPin, Clock, User, Phone,
-  X, Loader2, Send, CheckCircle2, ChevronRight,
-  Wrench, Clock3, CircleCheck, ClipboardList, Trophy, Search, Award, Medal, Sprout
+  ClipboardList, Trophy, Camera, MapPin, User, Phone,
+  Trash2, X, Loader2, Award, Medal, Sprout, ImageOff,
+  ShieldCheck, RefreshCw, KeyRound, Lock, Search, Download, Calendar, SlidersHorizontal, ChevronRight
 } from "lucide-react";
 
-// ── 팔레트 ──────────────────────────────────────────
 const C = {
-  bg: "#F4F7F0", surface: "#FFFFFF", surfaceAlt: "#EFF4E8",
-  line: "#E0E6D6", text: "#1F2A17", muted: "#77816E",
-  yellow: "#639922", red: "#D6483B", blue: "#5A9BE8",
-  green: "#3B6D11", orange: "#D97B34",
+  bg: "#F2F8FD", surface: "#FFFFFF", surfaceAlt: "#E8F2FB",
+  line: "#D6E6F5", text: "#17293B", muted: "#5E7893",
+  yellow: "#E8A93B", red: "#E0574A", blue: "#2E8AE0", green: "#3FA372", orange: "#DB8A3F",
 };
-
-// ── 미완료 조치 로컬 저장 (이 기기에서 "즉시 조치 가능" 선택했지만 아직 완료 안 한 신고) ──
-const PENDING_KEY = "acha-pending-actions";
-const MY_NAME_KEY = "acha-my-name";
-
-function saveMyName(name) {
-  try { localStorage.setItem(MY_NAME_KEY, name); } catch {}
-}
-function loadMyName() {
-  try { return localStorage.getItem(MY_NAME_KEY) || ""; } catch { return ""; }
-}
-
-function loadPendingIds() {
-  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]"); }
-  catch { return []; }
-}
-function addPendingId(id) {
-  const ids = loadPendingIds();
-  if (!ids.includes(id)) localStorage.setItem(PENDING_KEY, JSON.stringify([...ids, id]));
-}
-function removePendingId(id) {
-  const ids = loadPendingIds().filter((x) => x !== id);
-  localStorage.setItem(PENDING_KEY, JSON.stringify(ids));
-}
 
 const HAZARD_TYPES = [
   { id: "slip",     label: "🚶 넘어짐·미끄러짐·걸림", color: C.yellow },
@@ -51,7 +26,8 @@ const HAZARD_TYPES = [
   { id: "etc",      label: "📋 기타",                  color: C.muted },
 ];
 
-// 즉시 조치 불가 시 담당(개선) 부서 선택지
+// 관리자 부서 선택지 (신고자 앱과 동일). "안전환경실"은 전체 총괄 부서라
+// 어느 신고에 배정됐든 상관없이 모든 알림을 받는다.
 const DEPT_LIST = [
   "감사실", "안전환경실", "ESG전략실", "홍보비서실",
   "기획조정처", "경영지원처",
@@ -60,120 +36,63 @@ const DEPT_LIST = [
   "지역상생처", "체육공원처",
   "기술정보처", "연구분석처",
 ];
+const HEAD_DEPT = "안전환경실";
 
-const hazardOf    = (id) => HAZARD_TYPES.find((h) => h.id === id) || HAZARD_TYPES.at(-1);
-const hazardLabel = (r)  => (r.hazard === "etc" && r.hazardLabel) ? r.hazardLabel : hazardOf(r.hazard).label;
+const STATUS_META = {
+  pending:  { label: "조치 대기",      color: C.yellow, bg: "#E8A93B22" },
+  action:   { label: "조치 진행 중",   color: C.orange, bg: "#DB8A3F22" },
+  done:     { label: "조치 완료",      color: C.green,  bg: "#3FA37222" },
+  deferred: { label: "즉시 조치 불가", color: C.red,    bg: "#E0574A22" },
+};
 
-function nowLocalInput() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
+const hazardOf = (id) => HAZARD_TYPES.find((h) => h.id === id) || HAZARD_TYPES.at(-1);
+const hazardLabel = (r) => (r.hazard === "etc" && r.hazardLabel) ? r.hazardLabel : hazardOf(r.hazard).label;
 
 function fmtDateTime(v) {
   if (!v) return "";
   return new Date(v).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function compressImage(file, maxW = 900, quality = 0.62) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxW / img.width);
-        const canvas = document.createElement("canvas");
-        canvas.width  = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = () => reject(new Error("이미지 로드 실패"));
-      img.src = e.target.result;
-    };
-    reader.onerror = () => reject(new Error("파일 읽기 실패"));
-    reader.readAsDataURL(file);
-  });
+function getTier(count) {
+  if (count >= 11) return { label: "골드 파수꾼",   icon: Award,  color: C.yellow };
+  if (count >= 6)  return { label: "실버 파수꾼",   icon: Medal,  color: "#C7CDD6" };
+  if (count >= 3)  return { label: "브론즈 파수꾼", icon: Medal,  color: "#C77D4C" };
+  return                   { label: "새싹 파수꾼",  icon: Sprout, color: C.green };
 }
 
+const ADMIN_PIN = "1234";
+
 /* ════════════════════════════ ROOT ════════════════════════════ */
-export default function ReportApp() {
-  const [tab, setTab] = useState("report"); // report | myRank
-  const [flow, setFlow] = useState(null);
-  const [currentId, setCurrentId] = useState(null);
-  const [currentReport, setCurrentReport] = useState(null);
-  const [pendingReports, setPendingReports] = useState([]);
-  const [pendingLoading, setPendingLoading] = useState(true);
+export default function AdminApp() {
+  const [authed, setAuthed]   = useState(false);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pushDebug, setPushDebug] = useState(null);
+  const [tab, setTab]         = useState("list");
+  const [lastLoaded, setLastLoaded] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      const ids = loadPendingIds();
-      if (ids.length === 0) { setPendingLoading(false); return; }
-      const ERROR = Symbol("error");
-      const results = await Promise.all(ids.map((id) => getReport(id).catch(() => ERROR)));
-      const stillPending = [];
-      for (let i = 0; i < ids.length; i++) {
-        const r = results[i];
-        if (r === ERROR) continue; // 일시적 오류: 다음에 다시 시도하도록 목록에 그대로 둠
-        if (r && r.status === "action") stillPending.push(r);
-        else removePendingId(ids[i]); // 완료됐거나 실제로 삭제된 신고만 정리
-      }
-      setPendingReports(stillPending);
-      setPendingLoading(false);
-    })();
-  }, []);
+    if (!authed) return;
+    setLoading(true);
+    const unsubscribe = subscribeReports((next) => {
+      setReports(next);
+      setLastLoaded(new Date());
+      setLoading(false);
+    });
+    registerForPush(getAdminDept()).then((res) => setPushDebug(res));
+    return () => unsubscribe();
+  }, [authed]);
 
-  const addReport = async (r) => {
-    const { id: tempId, ...data } = r;
-    const newId = await fbAddReport(r);
-    setCurrentId(newId);
-    setCurrentReport({ ...r, id: newId });
-    setFlow({ reportId: newId, step: "choose" });
-  };
+  const deleteReport = (id) => fbUpdateReport(id, { deleted: true, deletedAt: new Date().toISOString() });
+  const restoreReport = (id) => fbUpdateReport(id, { deleted: false, deletedAt: null });
+  const permanentlyDelete = (id) => fbDeleteReport(id);
+  const updateReport = (id, patch) => fbUpdateReport(id, patch);
+  const load = () => setLastLoaded(new Date());
 
-  const updateReport = async (id, patch) => {
-    await fbUpdateReport(id, patch);
-    setCurrentReport((prev) => prev ? { ...prev, ...patch } : prev);
-  };
+  const newCount = reports.filter((r) => !r.deleted && r.status === "deferred" && (getAdminDept() === HEAD_DEPT || r.assignedDept === getAdminDept())).length;
+  const trashCount = reports.filter((r) => r.deleted).length;
 
-  const handleChoose = (choice) => {
-    if (choice === "immediate") {
-      updateReport(currentId, { status: "action" });
-      addPendingId(currentId);
-      setPendingReports((prev) => prev.some((p) => p.id === currentId) ? prev : [...prev, { ...currentReport, status: "action" }]);
-      setFlow((f) => ({ ...f, step: "action" }));
-    } else {
-      setFlow((f) => ({ ...f, step: "confirmDefer" }));
-    }
-  };
-
-  const handleActionDone = async ({ actionDesc, actionPhoto }) => {
-    await updateReport(currentId, { status: "done", actionDesc, actionPhoto: actionPhoto || null, actionAt: new Date().toISOString() });
-    removePendingId(currentId);
-    setPendingReports((prev) => prev.filter((p) => p.id !== currentId));
-    setFlow((f) => ({ ...f, step: "done" }));
-  };
-
-  const handleDeferred = async (assignedDept) => {
-    await updateReport(currentId, { status: "deferred", assignedDept });
-    setFlow((f) => ({ ...f, step: "deferred" }));
-  };
-
-  const handleFlowEnd = () => { setFlow(null); setCurrentId(null); setCurrentReport(null); };
-
-  const handleBackToChoose = () => setFlow((f) => ({ ...f, step: "choose" }));
-
-  const handleResume = (report) => {
-    setCurrentId(report.id);
-    setCurrentReport(report);
-    setFlow({ reportId: report.id, step: "action" });
-  };
-
-  const handleRemoveAllPending = async (ids) => {
-    await Promise.all(ids.map((id) => fbDeleteReport(id).catch(() => {})));
-    ids.forEach(removePendingId);
-    setPendingReports((prev) => prev.filter((p) => !ids.includes(p.id)));
-  };
+  if (!authed) return <PinScreen onSuccess={() => setAuthed(true)} />;
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter', sans-serif" }}>
@@ -183,152 +102,453 @@ export default function ReportApp() {
         .osw  { font-family: 'Oswald', sans-serif; letter-spacing: 0.02em; }
         .mono { font-family: 'JetBrains Mono', monospace; }
         input, select, textarea { font-family: 'Inter', sans-serif; }
-        input:focus, select:focus, textarea:focus { outline: 2px solid ${C.yellow}; outline-offset: 1px; }
-        button:focus-visible { outline: 2px solid ${C.yellow}; outline-offset: 2px; }
-        ::placeholder { color: #5C6B7E; }
+        input:focus, select:focus, textarea:focus { outline: 2px solid ${C.blue}; outline-offset: 1px; }
+        ::placeholder { color: #9BB0C4; }
         @keyframes spin   { to { transform: rotate(360deg); } }
-        @keyframes fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes popin  { from { opacity:0; transform:scale(.92); } to { opacity:1; transform:scale(1); } }
+        @keyframes fadein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
       `}</style>
+
+      {pushDebug && !pushDebug.ok && (
+        <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.red, color: "#fff", padding: "10px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span>🔔 알림 등록 실패: {pushDebug.reason}</span>
+          <button onClick={() => setPushDebug(null)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
+      {pushDebug && pushDebug.ok && (
+        <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.green, color: "#fff", padding: "10px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span>🔔 알림 등록 성공! 이 기기로 알림을 받을 수 있어요.</span>
+          <button onClick={() => setPushDebug(null)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
 
       <div style={{ maxWidth: 440, margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         {/* 헤더 */}
-        <div style={{ background: C.surface, borderBottom: `1px solid ${C.line}`, padding: "18px 16px 14px", position: "sticky", top: 0, zIndex: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-              <img src="/icon-192.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ background: C.surface, borderBottom: `3px solid ${C.blue}`, padding: "18px 16px 14px", position: "sticky", top: 0, zIndex: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                <img src="/icon-192-admin.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+              <div>
+                <div className="osw" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1, display: "flex", alignItems: "center", gap: 8 }}>
+                  관리자 대시보드
+                  {newCount > 0 && (
+                    <span style={{ background: C.red, color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 20, padding: "2px 7px" }}>
+                      {newCount}
+                    </span>
+                  )}
+                </div>
+                <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                  {getAdminDept() || "부서 미선택"}
+                  {" · "}
+                  {lastLoaded ? `${lastLoaded.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} 업데이트` : "로딩 중…"}
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="osw" style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1 }}>아차사고 발굴</div>
-              <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>작은 발견이 큰 사고를 막아요.</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <button
+                onClick={() => registerForPush(getAdminDept()).then((res) => setPushDebug(res))}
+                aria-label="알림 받기"
+                style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, width: 32, height: 32, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}
+              >
+                🔔
+              </button>
+              <button onClick={load} aria-label="새로고침" style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, width: 32, height: 32, color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <RefreshCw size={14} />
+              </button>
             </div>
           </div>
         </div>
 
-        {/* 본문 */}
+        {/* 탭 컨텐츠 */}
         <div style={{ flex: 1, padding: "16px 16px 96px", overflowY: "auto" }}>
-          {flow ? (
-            <ActionFlow
-              flow={flow}
-              report={currentReport}
-              onChoose={handleChoose}
-              onActionDone={handleActionDone}
-              onDeferred={handleDeferred}
-              onEnd={handleFlowEnd}
-              onBackToChoose={handleBackToChoose}
-            />
-          ) : tab === "myRank" ? (
-            <MyRank />
-          ) : (
-            <>
-              {!pendingLoading && pendingReports.length > 0 && (
-                <PendingActions reports={pendingReports} onResume={handleResume} onRemoveAll={handleRemoveAllPending} />
-              )}
-              <ReportForm onSubmit={addReport} />
-            </>
-          )}
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", color: C.muted, gap: 10 }}>
+              <Loader2 size={26} style={{ animation: "spin 1s linear infinite" }} />
+              <span style={{ fontSize: 13 }}>불러오는 중…</span>
+            </div>
+          ) : tab === "list"
+            ? <ReportList reports={reports.filter((r) => !r.deleted && r.status !== "pending" && (getAdminDept() === HEAD_DEPT || r.assignedDept === getAdminDept()))} onDelete={deleteReport} onUpdate={updateReport} />
+            : tab === "trash"
+            ? <TrashList reports={reports.filter((r) => r.deleted)} onRestore={restoreReport} onPermanentDelete={permanentlyDelete} />
+            : <Ranking reports={reports.filter((r) => !r.deleted)} />
+          }
         </div>
 
         {/* 하단 탭 */}
-        {!flow && (
-          <div style={{ position: "sticky", bottom: 0, background: C.surface, borderTop: `1px solid ${C.line}`, display: "flex" }}>
-            <button onClick={() => setTab("report")} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: tab === "report" ? C.yellow : C.muted, borderTop: `2px solid ${tab === "report" ? C.yellow : "transparent"}`, marginTop: -1 }}>
-              <span style={{ fontSize: 20, lineHeight: 1 }}>🔍</span>
-              <span style={{ fontSize: 11, fontWeight: tab === "report" ? 600 : 500 }}>발견하기</span>
-            </button>
-            <button onClick={() => setTab("myRank")} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: tab === "myRank" ? C.yellow : C.muted, borderTop: `2px solid ${tab === "myRank" ? C.yellow : "transparent"}`, marginTop: -1 }}>
-              <span style={{ fontSize: 20, lineHeight: 1 }}>📊</span>
-              <span style={{ fontSize: 11, fontWeight: tab === "myRank" ? 600 : 500 }}>참여현황</span>
-            </button>
-          </div>
-        )}
+        <div style={{ position: "sticky", bottom: 0, display: "flex", background: C.surface, borderTop: `1px solid ${C.line}` }}>
+          {[
+            { id: "list",    label: "발견 현황", emoji: "🔍" },
+            { id: "ranking", label: "참여현황", emoji: "📊" },
+            { id: "trash",   label: "휴지통",   emoji: "🗑️", badge: trashCount },
+          ].map(({ id, label, emoji, badge }) => {
+            const active = tab === id;
+            return (
+              <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "10px 0 12px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", color: active ? C.blue : C.muted, borderTop: `2px solid ${active ? C.blue : "transparent"}`, marginTop: -1, position: "relative" }}>
+                <div style={{ position: "relative" }}>
+                  <span style={{ fontSize: 20, lineHeight: 1, filter: active ? "none" : "grayscale(35%) opacity(0.85)" }}>{emoji}</span>
+                  {!!badge && (
+                    <span style={{ position: "absolute", top: -6, right: -8, background: C.red, color: "#fff", fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: "1px 5px", lineHeight: 1.3 }}>{badge}</span>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: active ? 600 : 500 }}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ════════════════════════════ 조치 플로우 ════════════════════════════ */
-/* ════════════════════════════ 미완료 조치 이어하기 ════════════════════════════ */
-function PendingActions({ reports, onResume, onRemoveAll }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
+/* ════════════════════════════ 신고 목록 ════════════════════════════ */
+function ReportList({ reports, onDelete, onUpdate }) {
+  const [statusFilter, setStatusFilter] = useState("all"); // all | progress | deferred | done
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [hazardFilter, setHazardFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedId, setSelectedId] = useState(null); // 탭한 신고의 상세 페이지로 전환
+
+  let filtered = reports;
+  if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "action");
+  if (statusFilter === "deferred") filtered = filtered.filter((r) => r.status === "deferred");
+  if (statusFilter === "done") filtered = filtered.filter((r) => r.status === "done");
+  if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
+  if (searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    filtered = filtered.filter((r) =>
+      (r.location || "").toLowerCase().includes(q) ||
+      (r.reporterName || "").toLowerCase().includes(q) ||
+      (r.dept || "").toLowerCase().includes(q) ||
+      (r.desc || "").toLowerCase().includes(q)
+    );
+  }
+  if (dateFrom) filtered = filtered.filter((r) => r.occurredAt && r.occurredAt >= dateFrom);
+  if (dateTo) filtered = filtered.filter((r) => r.occurredAt && r.occurredAt <= `${dateTo}T23:59`);
+
+  const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const progressCount = reports.filter((r) => r.status === "action").length;
+  const deferredCount = reports.filter((r) => r.status === "deferred").length;
+  const doneCount     = reports.filter((r) => r.status === "done").length;
+
+  const handleExport = () => {
+    const rows = sorted.map((r) => ({
+      "위험유형": hazardLabel(r),
+      "발생일시": fmtDateTime(r.occurredAt),
+      "발생장소": r.location || "",
+      "소속": r.dept || "",
+      "이름": r.isAnonymous ? "익명" : (r.reporterName || ""),
+      "연락처": r.isAnonymous ? "익명" : (r.phone || ""),
+      "상황설명": r.desc || "",
+      "상태": (STATUS_META[r.status] || STATUS_META.pending).label,
+      "조치내용": r.actionDesc || "",
+      "조치일시": r.actionAt ? fmtDateTime(r.actionAt) : "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+      { wch: 30 }, { wch: 12 }, { wch: 30 }, { wch: 18 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "발견현황");
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `아차사고_발견현황_${today}.xlsx`);
+  };
+
+  const selectedReport = selectedId ? reports.find((r) => r.id === selectedId) : null;
+  if (selectedReport) {
+    return <ReportDetailPage report={selectedReport} onBack={() => setSelectedId(null)} onDelete={onDelete} />;
+  }
 
   return (
-    <div style={{ background: `${C.orange}14`, border: `1.5px solid ${C.orange}55`, borderRadius: 14, padding: 14, marginBottom: 18, animation: "fadein .3s ease" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Wrench size={16} color={C.orange} />
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>완료하지 못한 조치가 있어요</span>
+    <div style={{ animation: "fadein .3s ease" }}>
+      {/* 요약 배지 (클릭하면 필터로 동작) */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <StatBadge label="전체" value={reports.length} color={C.blue} active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+        <StatBadge label="조치진행중" value={progressCount} color={C.orange} active={statusFilter === "progress"} onClick={() => setStatusFilter("progress")} />
+        <StatBadge label="즉시조치불가" value={deferredCount} color={C.red} active={statusFilter === "deferred"} onClick={() => setStatusFilter("deferred")} />
+        <StatBadge label="조치완료" value={doneCount} color={C.green} active={statusFilter === "done"} onClick={() => setStatusFilter("done")} />
+      </div>
+
+      {/* 검색 + 필터 토글 + 내보내기 */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
+          <Search size={15} color={C.muted} style={{ flexShrink: 0 }} />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="장소, 이름, 소속, 내용 검색"
+            style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 13, padding: "9px 0", minWidth: 0 }}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 2, flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          )}
         </div>
         <button
-          onClick={() => setConfirmOpen(true)}
-          style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}
-          aria-label="목록 지우기"
+          onClick={() => setShowFilters((v) => !v)}
+          style={{ display: "flex", alignItems: "center", gap: 5, background: (dateFrom || dateTo) ? `${C.blue}22` : C.surface, border: `1.5px solid ${(dateFrom || dateTo) ? C.blue : C.line}`, borderRadius: 10, padding: "0 12px", color: (dateFrom || dateTo) ? C.blue : C.muted, cursor: "pointer", flexShrink: 0 }}
         >
-          <X size={16} />
+          <Calendar size={15} />
+        </button>
+        <button
+          onClick={handleExport}
+          disabled={sorted.length === 0}
+          style={{ display: "flex", alignItems: "center", gap: 5, background: C.green, border: "none", borderRadius: 10, padding: "0 14px", color: C.bg, cursor: sorted.length === 0 ? "default" : "pointer", flexShrink: 0, opacity: sorted.length === 0 ? 0.5 : 1, fontWeight: 700, fontSize: 12.5 }}
+        >
+          <Download size={14} /> 엑셀
         </button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {reports.map((r) => (
-          <button
-            key={r.id}
-            onClick={() => onResume(r)}
-            style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hazardLabel(r)}</div>
-              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</div>
-            </div>
-            <span style={{ fontSize: 12, color: C.orange, fontWeight: 700, flexShrink: 0 }}>이어하기</span>
-            <ChevronRight size={16} color={C.orange} style={{ flexShrink: 0 }} />
-          </button>
+
+      {showFilters && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+          <span style={{ fontSize: 11.5, color: C.muted, flexShrink: 0 }}>기간</span>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 6, color: C.text, fontSize: 12.5, padding: "6px 8px", minWidth: 0 }} />
+          <span style={{ color: C.muted, fontSize: 12 }}>~</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ flex: 1, background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 6, color: C.text, fontSize: 12.5, padding: "6px 8px", minWidth: 0 }} />
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 2, flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 위험유형 필터 */}
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 14 }}>
+        <Chip active={hazardFilter === "all"} onClick={() => setHazardFilter("all")} label="전체 유형" color={C.muted} />
+        {HAZARD_TYPES.map((h) => (
+          <Chip key={h.id} active={hazardFilter === h.id} onClick={() => setHazardFilter(h.id)} label={h.label} color={h.color} />
         ))}
       </div>
 
-      {confirmOpen && (
-        <div onClick={() => setConfirmOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(10,14,20,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.surface, borderRadius: 16, padding: 24, width: "100%", maxWidth: 320, animation: "popin .2s ease" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>목록에서 지울까요?</div>
-            <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>이 발견 기록이 삭제됩니다.</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setConfirmOpen(false)} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>
+      {sorted.length === 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
+          <ImageOff size={30} strokeWidth={1.5} />
+          <span style={{ fontSize: 13 }}>해당 발견 내역이 없습니다.</span>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {sorted.map((r) => {
+            const h  = hazardOf(r.hazard);
+            const st = STATUS_META[r.status] || STATUS_META.pending;
+            return (
               <button
-                onClick={() => { onRemoveAll(reports.map((r) => r.id)); setConfirmOpen(false); }}
-                style={{ flex: 2, padding: "11px 0", background: C.red, border: "none", borderRadius: 10, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 }}
+                key={r.id}
+                onClick={() => setSelectedId(r.id)}
+                style={{ width: "100%", textAlign: "left", background: C.surface, border: `1px solid ${C.line}`, borderLeft: `4px solid ${h.color}`, borderRadius: 12, padding: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
               >
-                지우기
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: h.color }}>{hazardLabel(r)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: st.color, background: st.bg, padding: "2px 8px", borderRadius: 20 }}>{st.label}</span>
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
+                    <MapPin size={12} color={C.muted} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.location}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                    <User size={11} style={{ flexShrink: 0 }} /> {r.dept ? `${r.dept} · ` : ""}{r.reporterName}
+                  </div>
+                </div>
+                <ChevronRight size={18} color={C.muted} style={{ flexShrink: 0 }} />
               </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-/* ════════════════════════════ 참여현황 (관리자앱과 동일) ════════════════════════════ */
-function getTier(count) {
-  if (count >= 11) return { label: "골드 파수꾼",   icon: Award,  color: C.yellow };
-  if (count >= 6)  return { label: "실버 파수꾼",   icon: Medal,  color: "#C7CDD6" };
-  if (count >= 3)  return { label: "브론즈 파수꾼", icon: Medal,  color: "#C77D4C" };
-  return                   { label: "새싹 파수꾼",  icon: Sprout, color: C.green };
+/* ── 신고 상세 페이지 ── */
+function ReportDetailPage({ report, onBack, onDelete }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [photoView, setPhotoView]   = useState(null);
+  const h  = hazardOf(report.hazard);
+  const st = STATUS_META[report.status] || STATUS_META.pending;
+
+  return (
+    <div style={{ animation: "fadein .2s ease" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: C.surface, border: `1.5px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 14px", marginBottom: 14 }}>
+        ← 목록으로
+      </button>
+
+      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderLeft: `4px solid ${h.color}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: h.color }}>{hazardLabel(report)}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: st.color, background: st.bg, padding: "3px 10px", borderRadius: 20 }}>{st.label}</span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <DetailRow icon={MapPin} label="발견 장소" value={report.location || "-"} />
+          <DetailRow icon={Calendar} label="발견 일시" value={fmtDateTime(report.occurredAt) || "-"} />
+          <DetailRow icon={User} label="신고자" value={`${report.dept ? report.dept + " · " : ""}${report.reporterName || "-"}`} />
+          {report.phone && <DetailRow icon={Phone} label="연락처" value={report.phone} />}
+          {report.assignedDept && <DetailRow icon={ClipboardList} label="요청 부서" value={report.assignedDept} />}
+        </div>
+
+        <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 14, paddingTop: 14 }}>
+          <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>상황 설명</div>
+          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6 }}>{report.desc || "-"}</p>
+        </div>
+
+        {report.photo && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>발견 사진</div>
+            <img
+              src={report.photo} alt="발견 사진" onClick={() => setPhotoView(report.photo)}
+              style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}`, cursor: "pointer" }}
+            />
+          </div>
+        )}
+      </div>
+
+      {report.status === "done" && report.actionDesc && (
+        <div style={{ background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, color: C.green, fontWeight: 700, marginBottom: 8 }}>✓ 조치 완료 내용</div>
+          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: report.actionAt || report.actionPhoto ? 10 : 0 }}>{report.actionDesc}</p>
+          {report.actionAt && <div className="mono" style={{ fontSize: 11.5, color: C.muted, marginBottom: report.actionPhoto ? 10 : 0 }}>{fmtDateTime(report.actionAt)}</div>}
+          {report.actionPhoto && (
+            <img
+              src={report.actionPhoto} alt="조치 사진" onClick={() => setPhotoView(report.actionPhoto)}
+              style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.green}40`, cursor: "pointer" }}
+            />
+          )}
+        </div>
+      )}
+
+      {!confirmDel ? (
+        <button onClick={() => setConfirmDel(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "transparent", border: `1.5px solid ${C.red}`, borderRadius: 12, padding: "12px 0", color: C.red, cursor: "pointer", fontSize: 13.5, fontWeight: 600 }}>
+          <Trash2 size={14} /> 삭제하기
+        </button>
+      ) : (
+        <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: C.muted }}>이 발견을 삭제할까요?</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setConfirmDel(false)} style={{ fontSize: 12.5, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}>취소</button>
+            <button onClick={() => { onDelete(report.id); onBack(); }} style={{ fontSize: 12.5, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}>삭제</button>
+          </div>
+        </div>
+      )}
+
+      {photoView && (
+        <div onClick={() => setPhotoView(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,14,20,0.9)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 24 }}>
+          <img src={photoView} alt="사진" style={{ maxWidth: "100%", maxHeight: "80vh", borderRadius: 12 }} />
+          <button onClick={() => setPhotoView(null)} style={{ position: "absolute", top: 20, right: 20, background: C.surface, border: "none", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <X size={18} color={C.text} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function MyRank() {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+function DetailRow({ icon: Icon, label, value }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <Icon size={14} color={C.muted} style={{ marginTop: 2, flexShrink: 0 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginTop: 1, wordBreak: "break-word" }}>{value}</div>
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const all = await getAllReports();
-        setReports(all);
-      } catch { setReports([]); }
-      finally { setLoading(false); }
-    })();
-  }, []);
+/* ════════════════════════════ 휴지통 ════════════════════════════ */
+function TrashList({ reports, onRestore, onPermanentDelete }) {
+  const [confirmId, setConfirmId] = useState(null);
+  const sorted = [...reports].sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
 
+  if (sorted.length === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
+        <Trash2 size={30} strokeWidth={1.5} />
+        <span style={{ fontSize: 13 }}>휴지통이 비어있어요.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ animation: "fadein .3s ease" }}>
+      <p style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.6 }}>
+        삭제된 발견은 여기서 복구하거나 완전히 지울 수 있어요.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {sorted.map((r) => {
+          const h = hazardOf(r.hazard);
+          return (
+            <div key={r.id} style={{ background: C.surface, borderRadius: 12, padding: 12, borderLeft: `4px solid ${C.line}`, opacity: 0.85 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: h.color }}>{hazardLabel(r)}</span>
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                <MapPin size={12} color={C.muted} /> {r.location}
+              </div>
+              <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
+                {r.deletedAt ? `${fmtDateTime(r.deletedAt)} 삭제됨` : ""}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={() => onRestore(r.id)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: `${C.blue}18`, border: `1px solid ${C.blue}`, borderRadius: 8, padding: "7px 0", color: C.blue, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                  <RefreshCw size={12} /> 복구
+                </button>
+                <button onClick={() => setConfirmId(r.id)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 0", color: C.muted, fontSize: 12.5, cursor: "pointer" }}>
+                  완전 삭제
+                </button>
+              </div>
+
+              {confirmId === r.id && (
+                <div style={{ marginTop: 10, background: C.surfaceAlt, borderRadius: 8, padding: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>영구 삭제할까요? 되돌릴 수 없어요.</span>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => setConfirmId(null)} style={{ fontSize: 12, background: "transparent", border: `1px solid ${C.line}`, color: C.muted, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>취소</button>
+                    <button onClick={() => { onPermanentDelete(r.id); setConfirmId(null); }} style={{ fontSize: 12, background: C.red, border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>삭제</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatBadge({ label, value, color, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1, background: active ? `${color}22` : C.surface, borderRadius: 9, padding: "8px 3px",
+        textAlign: "center", border: `1.5px solid ${active ? color : C.line}`, cursor: "pointer", minWidth: 0,
+      }}
+    >
+      <div className="mono" style={{ fontSize: 16, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 9.5, color: active ? color : C.muted, marginTop: 2, fontWeight: active ? 700 : 400, whiteSpace: "nowrap" }}>{label}</div>
+    </button>
+  );
+}
+
+function Chip({ active, onClick, label, color }) {
+  return (
+    <button onClick={onClick} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${active ? color : C.line}`, background: active ? `${color}22` : "transparent", color: active ? color : C.muted }}>
+      {label}
+    </button>
+  );
+}
+
+/* ════════════════════════════ 참여현황 ════════════════════════════ */
+function Ranking({ reports }) {
   const named = reports.filter((r) => r.reporterName);
 
+  // 신고자별 집계
   const map = {};
   named.forEach((r) => {
     if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0 };
@@ -337,20 +557,13 @@ function MyRank() {
   });
   const ranked = Object.values(map).sort((a, b) => b.total - a.total || b.done - a.done);
 
+  const rankColor = (_i) => C.muted;
   const rankEmoji = (i) => `${i + 1}`;
-
-  if (loading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
-        <Loader2 size={22} color={C.muted} style={{ animation: "spin 1s linear infinite" }} />
-      </div>
-    );
-  }
 
   if (ranked.length === 0) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", color: C.muted, textAlign: "center" }}>
-        <Trophy size={30} strokeWidth={1.5} />
+        <ImageOff size={30} strokeWidth={1.5} />
         <span style={{ fontSize: 13 }}>발견 데이터가 쌓이면 순위가 표시됩니다.</span>
       </div>
     );
@@ -369,8 +582,8 @@ function MyRank() {
         <span style={{ width: 36, fontSize: 11.5, fontWeight: 700, color: C.muted }}>순위</span>
         <span style={{ width: 76, fontSize: 11.5, fontWeight: 700, color: C.muted, flexShrink: 0 }}>소속</span>
         <span style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: C.muted }}>이름</span>
-        <span style={{ width: 56, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>발견</span>
-        <span style={{ width: 56, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>조치완료</span>
+        <span style={{ width: 64, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>발견</span>
+        <span style={{ width: 64, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>조치완료</span>
       </div>
 
       {/* 테이블 행 */}
@@ -385,8 +598,8 @@ function MyRank() {
             <span className="mono" style={{ width: 36, fontSize: 13, fontWeight: 700, color: C.muted }}>{rankEmoji(i)}</span>
             <span style={{ width: 76, fontSize: 12, color: C.muted, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.dept}</span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.text }}>{p.name}</span>
-            <span className="mono" style={{ width: 56, fontSize: 15, fontWeight: 700, color: C.yellow, textAlign: "center" }}>{p.total - p.done}</span>
-            <span className="mono" style={{ width: 56, fontSize: 15, fontWeight: 700, color: C.green, textAlign: "center" }}>{p.done}</span>
+            <span className="mono" style={{ width: 64, fontSize: 15, fontWeight: 700, color: C.yellow, textAlign: "center" }}>{p.total - p.done}</span>
+            <span className="mono" style={{ width: 64, fontSize: 15, fontWeight: 700, color: C.green, textAlign: "center" }}>{p.done}</span>
           </div>
         ))}
       </div>
@@ -394,548 +607,102 @@ function MyRank() {
   );
 }
 
-function ActionFlow({ flow, report, onChoose, onActionDone, onDeferred, onEnd, onBackToChoose }) {
-  const steps = [
-    { id: "choose",       label: "조치 선택" },
-    { id: "action",       label: "조치 진행" },
-    { id: "done",         label: "완료" },
-  ];
-  const stepIdx = ["choose","confirmDefer"].includes(flow.step) ? 0
-    : flow.step === "action" ? 1
-    : flow.step === "done"   ? 2 : 0;
-
-  return (
-    <div style={{ animation: "fadein .3s ease" }}>
-      {/* 스텝 인디케이터 (deferred 제외) */}
-      {flow.step !== "deferred" && (
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 24 }}>
-          {steps.map((s, i) => {
-            const past = i < stepIdx, current = i === stepIdx;
-            return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : "unset" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: past ? C.green : current ? C.yellow : C.surfaceAlt, border: `2px solid ${past ? C.green : current ? C.yellow : C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {past ? <CheckCircle2 size={14} color={C.bg} /> : <span style={{ fontSize: 12, fontWeight: 700, color: current ? C.bg : C.muted }}>{i + 1}</span>}
-                  </div>
-                  <span style={{ fontSize: 10, color: current ? C.yellow : past ? C.green : C.muted, fontWeight: current ? 700 : 400, whiteSpace: "nowrap" }}>{s.label}</span>
-                </div>
-                {i < steps.length - 1 && <div style={{ flex: 1, height: 2, background: past ? C.green : C.line, margin: "0 6px", marginBottom: 18 }} />}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {flow.step === "choose"      && <StepChoose onChoose={onChoose} onBack={onEnd} />}
-      {flow.step === "confirmDefer"&& <StepConfirmDefer report={report} onConfirm={onDeferred} onBack={onBackToChoose} />}
-      {flow.step === "action"      && <StepAction report={report} onDone={onActionDone} onBack={onBackToChoose} />}
-      {flow.step === "done"        && <StepDone report={report} onEnd={onEnd} />}
-      {flow.step === "deferred"    && <StepDeferred onEnd={onEnd} />}
-    </div>
-  );
-}
-
-/* ── 조치 선택 ── */
-function StepChoose({ onChoose, onBack }) {
-  return (
-    <div style={{ animation: "popin .25s ease" }}>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: C.surface, border: `1.5px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 16, padding: "8px 14px" }}>← 발견으로 돌아가기</button>
-      <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>위험요소를 바로 조치할 수 있나요?</div>
-      <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>현장에서 바로 위험 요소를 제거하거나 조치할 수 있는지 선택해주세요.</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <button onClick={() => onChoose("immediate")} style={{ display: "flex", alignItems: "center", gap: 14, background: `${C.green}18`, border: `1.5px solid ${C.green}`, borderRadius: 14, padding: "16px 18px", cursor: "pointer", textAlign: "left" }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.green}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>
-            🔧
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.green }}>바로 조치 가능해요</div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>지금 바로 조치 후 결과를 기록합니다</div>
-          </div>
-          <ChevronRight size={18} color={C.green} style={{ marginLeft: "auto" }} />
-        </button>
-        <button onClick={() => onChoose("deferred")} style={{ display: "flex", alignItems: "center", gap: 14, background: `${C.red}18`, border: `1.5px solid ${C.red}`, borderRadius: 14, padding: "16px 18px", cursor: "pointer", textAlign: "left" }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.red}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>
-            ⏰
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.red }}>조치가 필요해요</div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>담당자에게 알림을 보냅니다</div>
-          </div>
-          <ChevronRight size={18} color={C.red} style={{ marginLeft: "auto" }} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ── 즉시 조치 불가 확인 모달 ── */
-function StepConfirmDefer({ report, onConfirm, onBack }) {
-  const [submitting, setSubmitting] = useState(false);
-  const [assignedDept, setAssignedDept] = useState("");
+/* ════════════════════════════ PIN 화면 ════════════════════════════ */
+function PinScreen({ onSuccess }) {
+  const [pin, setPin]     = useState("");
+  const [error, setError] = useState("");
+  const [needsDept, setNeedsDept] = useState(false); // PIN 통과했지만 부서 선택이 아직 없는 경우
+  const [dept, setDept]   = useState("");
   const [deptError, setDeptError] = useState(false);
-  const [showWarn, setShowWarn] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
 
-  const handleRequestClick = () => {
-    if (!assignedDept) { setDeptError(true); return; }
-    setShowWarn(true);
+  const check = () => {
+    if (pin !== ADMIN_PIN) { setError("PIN이 올바르지 않습니다."); setPin(""); return; }
+    if (getAdminDept()) { onSuccess(); return; }
+    setNeedsDept(true);
   };
 
-  const doConfirm = async () => {
-    setSubmitting(true);
-    await onConfirm(assignedDept);
-    setSubmitting(false);
+  const confirmDept = () => {
+    if (!dept) { setDeptError(true); return; }
+    setAdminDept(dept);
+    onSuccess();
   };
 
-  return (
-    <div style={{ animation: "popin .25s ease", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "10px 0", textAlign: "center" }}>
-      <div style={{ width: 190, height: 190, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src="/icon-confirm.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      </div>
-      <div>
-        <div className="osw" style={{ fontSize: 17, fontWeight: 700, color: C.red }}>어느 부서에 조치를 요청할까요?</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>위험요소를 개선할 부서를 선택해 주세요.</p>
-      </div>
-
-      <div style={{ width: "100%", textAlign: "left", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-        <label style={{ display: "block", fontSize: 12.5, color: C.text, fontWeight: 600, marginBottom: 8 }}>어느 부서의 도움이 필요할까요?</label>
-        <select
-          value={assignedDept}
-          onChange={(e) => { setAssignedDept(e.target.value); setDeptError(false); }}
-          style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${deptError ? C.red : C.line}`, borderRadius: 10, padding: "12px 14px", fontSize: 14, color: assignedDept ? C.text : C.muted, outline: "none" }}
-        >
-          <option value="">부서를 선택하세요</option>
-          {DEPT_LIST.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-        {deptError && <div style={{ fontSize: 11.5, color: C.red, marginTop: 5 }}>부서를 선택해주세요.</div>}
-      </div>
-
-      {report && (
-        <div style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, textAlign: "left" }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
-              <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
-            </div>
-            <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
-              <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
-            </div>
-          </div>
-          {[
-            { label: "위험 유형", value: hazardLabel(report) },
-            { label: "발견 일시", value: fmtDateTime(report.occurredAt) },
-            { label: "발견 장소", value: report.location },
-            { label: "상황 설명", value: report.desc },
-            ...(assignedDept ? [{ label: "요청 부서", value: assignedDept }] : []),
-          ].map((r, i, arr) => (
-            <div key={r.label} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
-              <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
-              <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
-            </div>
-          ))}
-          {report.photo && (
-            <div style={{ paddingTop: 10 }}>
-              <img src={report.photo} alt="첨부 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
-            </div>
-          )}
-        </div>
-      )}
-
-      <div style={{ display: "flex", gap: 10, width: "100%" }}>
-        <button onClick={onBack} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>돌아가기</button>
-        <button onClick={handleRequestClick} className="osw" style={{ flex: 2, padding: "13px 0", background: C.red, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700 }}>조치 요청하기</button>
-      </div>
-
-      {showWarn && (
-        <div onClick={() => !submitting && setShowWarn(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 16, padding: 22, width: "100%", maxWidth: 320, animation: "popin .2s ease", textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-            <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>요청 후에는 취소하거나 수정할 수 없어요.<br />정말 요청하시겠어요?</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setShowWarn(false)} disabled={submitting} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>
-              <button onClick={doConfirm} disabled={submitting} className="osw" style={{ flex: 2, padding: "11px 0", background: C.red, border: "none", borderRadius: 10, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, opacity: submitting ? 0.7 : 1 }}>
-                {submitting ? "요청 중…" : "요청할게요"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── 조치 내용 입력 ── */
-function StepAction({ report, onDone, onBack }) {
-  const [actionDesc, setActionDesc]   = useState("");
-  const [actionPhoto, setActionPhoto] = useState(null);
-  const [photoBusy, setPhotoBusy]     = useState(false);
-  const [errors, setErrors]           = useState({});
-  const [submitting, setSubmitting]   = useState(false);
-  const [confirming, setConfirming]   = useState(false);
-  const [showWarn, setShowWarn]       = useState(false);
-  const fileRef = useRef(null);
-
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoBusy(true);
-    try   { setActionPhoto(await compressImage(file)); setErrors((p) => ({ ...p, photo: undefined })); }
-    catch { setErrors((p) => ({ ...p, photo: "사진 처리에 실패했어요." })); }
-    finally { setPhotoBusy(false); }
-  };
-
-  const handleReview = () => {
-    const e = {};
-    if (!actionDesc.trim()) e.desc = "필수 작성입니다.";
-    if (!actionPhoto)       e.photo = "필수 작성입니다.";
-    setErrors(e);
-    if (Object.keys(e).length > 0) return;
-    setConfirming(true);
-  };
-
-  const handleFinalSubmit = async () => {
-    setSubmitting(true);
-    await onDone({ actionDesc: actionDesc.trim(), actionPhoto });
-    setSubmitting(false);
-  };
-
-  if (confirming) {
+  if (needsDept) {
     return (
-      <div style={{ animation: "popin .25s ease" }}>
-        <div className="osw" style={{ fontSize: 17, fontWeight: 700, marginBottom: 14 }}>이대로 등록할까요?</div>
-
-        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
-          {report && (
-            <>
-              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>소속</div>
-                  <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.dept || "-"}</div>
-                </div>
-                <div style={{ flex: 1, background: C.surfaceAlt, borderRadius: 10, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginBottom: 2 }}>이름</div>
-                  <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700 }}>{report.reporterName || "-"}</div>
-                </div>
-              </div>
-              {[
-                { label: "위험 유형", value: hazardLabel(report) },
-                { label: "발견 장소", value: report.location },
-                { label: "상황 설명", value: report.desc },
-              ].map((r) => (
-                <div key={r.label} style={{ display: "flex", gap: 10, padding: "6px 0" }}>
-                  <div style={{ width: 60, flexShrink: 0, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{r.label}</div>
-                  <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: "break-word" }}>{r.value || "-"}</div>
-                </div>
-              ))}
-              <div style={{ borderTop: `1px solid ${C.line}`, margin: "8px 0" }} />
-            </>
-          )}
-          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 내용</div>
-          <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: actionPhoto ? 12 : 0 }}>{actionDesc}</p>
-          {actionPhoto && (
-            <img src={actionPhoto} alt="조치 사진" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => setConfirming(false)} disabled={submitting} style={{ flex: 1, padding: "13px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
-            돌아가기
-          </button>
-          <button onClick={() => setShowWarn(true)} disabled={submitting} className="osw"
-            style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
-            {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <CircleCheck size={17} />}
-            등록할게요
-          </button>
-        </div>
-
-        {showWarn && (
-          <div onClick={() => !submitting && setShowWarn(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 16, padding: 22, width: "100%", maxWidth: 320, animation: "popin .2s ease", textAlign: "center" }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-              <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>등록 후에는 수정할 수 없어요.<br />정말 등록하시겠어요?</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setShowWarn(false)} disabled={submitting} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 14 }}>취소</button>
-                <button onClick={() => { setShowWarn(false); handleFinalSubmit(); }} disabled={submitting} className="osw" style={{ flex: 2, padding: "11px 0", background: C.green, border: "none", borderRadius: 10, color: C.bg, cursor: "pointer", fontSize: 14, fontWeight: 700, opacity: submitting ? 0.7 : 1 }}>
-                  {submitting ? "등록 중…" : "등록할게요"}
-                </button>
-              </div>
-            </div>
+      <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Inter:wght@400;500;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .osw { font-family: 'Oswald', sans-serif; }
+          @keyframes fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        `}</style>
+        <div style={{ width: "100%", maxWidth: 320, animation: "fadein .3s ease" }}>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>소속 부서를 선택해주세요</div>
           </div>
-        )}
+          <div style={{ background: C.surface, borderRadius: 16, padding: 24 }}>
+            <select
+              value={dept}
+              onChange={(e) => { setDept(e.target.value); setDeptError(false); }}
+              style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${deptError ? C.red : C.line}`, borderRadius: 12, padding: "13px 14px", fontSize: 15, color: dept ? C.text : C.muted, outline: "none", marginBottom: deptError ? 8 : 16 }}
+            >
+              <option value="">부서를 선택하세요</option>
+              {DEPT_LIST.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            {deptError && <p style={{ fontSize: 12, color: C.red, marginBottom: 12, textAlign: "center" }}>부서를 선택해주세요.</p>}
+            <button onClick={confirmDept} className="osw"
+              style={{ width: "100%", padding: "13px 0", background: C.blue, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700 }}>
+              완료
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadein .25s ease" }}>
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: C.surface, border: `1.5px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 14px", alignSelf: "flex-start" }}>← 조치 선택으로 돌아가기</button>
-
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <img src="/icon-action.png" alt="" style={{ width: 150, height: 150, objectFit: "contain" }} />
-      </div>
-
-      <div className="osw" style={{ fontSize: 17, fontWeight: 700, textAlign: "center" }}>조치 내용을 기록해주세요</div>
-
-      <div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>조치 후 사진을 보여주세요</div>
-        {actionPhoto ? (
-          <div style={{ position: "relative", width: 130 }}>
-            <img src={actionPhoto} alt="조치 사진" style={{ width: 130, height: 130, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
-            <button onClick={() => { setActionPhoto(null); if (fileRef.current) fileRef.current.value = ""; }} style={{ position: "absolute", top: -8, right: -8, background: C.red, border: "none", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <X size={14} color="#fff" />
-            </button>
+    <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Inter:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; }
+        .osw { font-family: 'Oswald', sans-serif; }
+        @keyframes fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+      `}</style>
+      <div style={{ width: "100%", maxWidth: 320, animation: "fadein .3s ease" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, marginBottom: 32 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 18, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <img src="/icon-192-admin.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
-        ) : (
-          <button onClick={() => fileRef.current?.click()} disabled={photoBusy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: C.surface, border: `1.5px dashed ${errors.photo ? C.red : C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 13 }}>
-            {photoBusy ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Camera size={16} />}
-            {photoBusy ? "처리 중…" : "조치 후 사진 찍기"}
-          </button>
-        )}
-        <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
-        {errors.photo && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{errors.photo}</div>}
-      </div>
-
-      <div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>어떤 조치를 취했는지 적어주세요</div>
-        <textarea value={actionDesc} onChange={(e) => { setActionDesc(e.target.value); setErrors((p) => ({ ...p, desc: undefined })); }} placeholder={"예: 미끄럼 방지 테이프 부착, 안전 표지판 설치 등"} rows={4}
-          style={{ width: "100%", background: C.surface, border: `1px solid ${errors.desc ? C.red : C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
-        {errors.desc && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{errors.desc}</div>}
-      </div>
-
-      <button onClick={handleReview} disabled={photoBusy} className="osw"
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: photoBusy ? 0.7 : 1 }}>
-        <CircleCheck size={17} />
-        등록
-      </button>
-    </div>
-  );
-}
-
-/* ── 조치 완료 ── */
-function StepDone({ report, onEnd }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 230, height: 230, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src="/icon-done.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      </div>
-      <div>
-        <div className="osw" style={{ fontSize: 20, fontWeight: 700, color: C.green }}>조치 완료!</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>안전한 현장을 만들어주셔서 감사합니다.</p>
-      </div>
-      <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
-        돌아가기
-      </button>
-    </div>
-  );
-}
-
-/* ── 즉시 조치 불가 완료 ── */
-function StepDeferred({ onEnd }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0", animation: "popin .3s ease", textAlign: "center" }}>
-      <div style={{ width: 230, height: 230, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src="/icon-undone.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      </div>
-      <div>
-        <div className="osw" style={{ fontSize: 19, fontWeight: 700, color: C.red }}>조치를 요청했습니다!</div>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.6 }}>안전한 작업환경을 만드는 데<br />함께해 주셔서 감사합니다.</p>
-      </div>
-      <div style={{ width: "100%", background: `${C.red}12`, border: `1px solid ${C.red}40`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, color: C.red, fontWeight: 600, flexShrink: 0 }}>⚠ 주의사항</span>
-        <span style={{ fontSize: 11.5, color: C.muted }}>접근을 제한하고 동료에게 알려주세요.</span>
-      </div>
-      <button onClick={onEnd} className="osw" style={{ width: "100%", background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
-        돌아가기
-      </button>
-    </div>
-  );
-}
-
-/* ════════════════════════════ 신고 폼 ════════════════════════════ */
-function ReportForm({ onSubmit }) {
-  const [hazard, setHazard]         = useState(HAZARD_TYPES[0].id);
-  const [etcLabel, setEtcLabel]     = useState("");
-  const [occurredAt, setOccurredAt] = useState(nowLocalInput());
-  const [location, setLocation]     = useState("");
-  const [dept, setDept]             = useState("");
-  const [name, setName]             = useState("");
-  const [phone, setPhone]           = useState("");
-  const [desc, setDesc]             = useState("");
-  const [photo, setPhoto]           = useState(null);
-  const [photoBusy, setPhotoBusy]   = useState(false);
-  const [errors, setErrors]         = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [consent, setConsent]       = useState(false);
-  const fileRef = useRef(null);
-
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoBusy(true);
-    try   { setPhoto(await compressImage(file)); setErrors((p) => ({ ...p, photo: undefined })); }
-    catch { setErrors((p) => ({ ...p, photo: "사진 처리 실패" })); }
-    finally { setPhotoBusy(false); }
-  };
-
-  const validate = () => {
-    const e = {};
-    if (!occurredAt)           e.occurredAt = "필수 작성입니다.";
-    if (!location.trim())      e.location   = "필수 작성입니다.";
-    if (!dept.trim())          e.dept       = "필수 작성입니다.";
-    if (!name.trim())          e.name       = "필수 작성입니다.";
-    if (!phone.trim())         e.phone      = "필수 작성입니다.";
-    if (!desc.trim())          e.desc       = "필수 작성입니다.";
-    if (!photo)                e.photo      = "필수 작성입니다.";
-    if (hazard === "etc" && !etcLabel.trim()) e.etcLabel = "필수 작성입니다.";
-    if (!consent)              e.consent    = "동의가 필요합니다.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-    setSubmitting(true);
-    saveMyName(name.trim());
-    await onSubmit({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      reporterName: name.trim(), phone: phone.trim(), dept: dept.trim(),
-      location: location.trim(), occurredAt,
-      hazard, hazardLabel: hazard === "etc" ? etcLabel.trim() : null,
-      desc: desc.trim(), photo, status: "pending",
-      createdAt: new Date().toISOString(),
-    });
-    setSubmitting(false);
-    setHazard(HAZARD_TYPES[0].id); setEtcLabel("");
-    setOccurredAt(nowLocalInput()); setLocation("");
-    setDept(""); setName(""); setDesc(""); setPhoto(null);
-    setConsent(false);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-  const iS = { flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, padding: "10px 0", width: "100%" };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadein .3s ease" }}>
-
-      {/* 1. 위험 유형 */}
-      <Field label="1. 위험 유형" error={errors.etcLabel}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {HAZARD_TYPES.map((h) => (
-            <button key={h.id} onClick={() => setHazard(h.id)} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${hazard === h.id ? h.color : C.line}`, background: hazard === h.id ? `${h.color}22` : C.surface, color: hazard === h.id ? h.color : C.muted }}>
-              {h.label}
-            </button>
-          ))}
-        </div>
-        {hazard === "etc" && (
-          <input value={etcLabel} onChange={(e) => { setEtcLabel(e.target.value); setErrors((p) => ({ ...p, etcLabel: undefined })); }}
-            placeholder="위험 유형을 직접 입력해주세요"
-            style={{ ...iS, marginTop: 10, border: `1px solid ${errors.etcLabel ? C.red : C.line}`, borderRadius: 10, padding: "9px 12px", background: C.surface }} />
-        )}
-      </Field>
-
-      {/* 2. 언제 발견했나요? */}
-      <Field label="2. 발견한 일시를 알려주세요" error={errors.occurredAt}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
-          <Clock size={15} color={C.muted} />
-          <input type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} style={iS} />
-        </div>
-      </Field>
-
-      {/* 3. 어디서 봤나요? */}
-      <Field label="3. 발견된 장소를 알려주세요" error={errors.location}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
-          <MapPin size={15} color={C.muted} />
-          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="예: 제3매립장 침출수 처리시설 앞" style={iS} />
-        </div>
-      </Field>
-
-      {/* 4. 소속 */}
-      <Field label="4. 소속을 알려주세요" error={errors.dept}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
-          <ClipboardList size={15} color={C.muted} />
-          <input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="예: 안전환경실" style={iS} />
-        </div>
-      </Field>
-
-      {/* 5. 이름 */}
-      <Field label="5. 이름을 알려주세요" error={errors.name}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
-          <User size={15} color={C.muted} />
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 홍길동" style={iS} />
-        </div>
-      </Field>
-
-      {/* 6. 전화번호 */}
-      <Field label="6. 연락처를 알려주세요" error={errors.phone}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
-          <Phone size={15} color={C.muted} />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="예: 010-1234-5678" inputMode="tel" style={iS} />
-        </div>
-        <p style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>추후 포상 안내 등 필요시 연락드릴 수 있습니다.</p>
-      </Field>
-
-      {/* 7. 어떤 위험이었나요? */}
-      <Field label="7. 어떤 상황이었나요?" error={errors.desc}>
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="어떤 점이 위험해 보였는지 알려주세요." rows={4}
-          style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
-      </Field>
-
-      {/* 8. 사진 첨부 */}
-      <Field label="8. 사진을 보여주세요" error={errors.photo}>
-        {photo ? (
-          <div style={{ position: "relative", width: 120 }}>
-            <img src={photo} alt="첨부" style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
-            <button onClick={() => { setPhoto(null); if (fileRef.current) fileRef.current.value = ""; }} style={{ position: "absolute", top: -8, right: -8, background: C.red, border: "none", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <X size={14} color="#fff" />
-            </button>
+          <div style={{ textAlign: "center" }}>
+            <div className="osw" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>관리자 대시보드</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>PIN 번호를 입력해주세요</div>
           </div>
-        ) : (
-          <button onClick={() => fileRef.current?.click()} disabled={photoBusy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: C.surface, border: `1.5px dashed ${errors.photo ? C.red : C.line}`, borderRadius: 10, color: C.muted, cursor: "pointer", fontSize: 13 }}>
-            {photoBusy ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Camera size={16} />}
-            {photoBusy ? "처리 중…" : "사진 선택하기"}
+        </div>
+
+        <div style={{ background: C.surface, borderRadius: 16, padding: 24 }}>
+          <div style={{ position: "relative", background: C.surfaceAlt, border: `1.5px solid ${error ? C.red : C.line}`, borderRadius: 12, padding: "0 16px", marginBottom: error ? 8 : 16 }}>
+            <Lock size={16} color={C.muted} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              ref={inputRef}
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => { setPin(e.target.value.replace(/\D/g, "")); setError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && check()}
+              placeholder="● ● ● ●"
+              style={{ width: "100%", background: "transparent", border: "none", color: C.text, fontSize: 20, letterSpacing: 8, textAlign: "center", padding: "14px 0", outline: "none" }}
+            />
+          </div>
+          {error && <p style={{ fontSize: 12, color: C.red, marginBottom: 12, textAlign: "center" }}>{error}</p>}
+          <button onClick={check} className="osw"
+            style={{ width: "100%", padding: "13px 0", background: C.blue, border: "none", borderRadius: 12, color: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700 }}>
+            확인
           </button>
-        )}
-        <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
-      </Field>
-
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, background: C.surfaceAlt, border: `1px solid ${errors.consent ? C.red : C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer" }}>
-        <input
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: undefined })); }}
-          style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16, accentColor: C.blue, cursor: "pointer" }}
-        />
-        <span style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-          [개인정보 수집·이용 동의 문구 자리 — 추후 작성 예정]
-        </span>
-      </label>
-      {errors.consent && <span style={{ fontSize: 11.5, color: C.red, marginTop: -10 }}>{errors.consent}</span>}
-
-      <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.yellow, color: C.bg, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: submitting || photoBusy ? 0.7 : 1, marginTop: 4 }}>
-        {submitting ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={16} />}
-        다음으로
-      </button>
-    </div>
-  );
-}
-
-/* ── 제출 전 최종 확인 화면 ── */
-function Field({ label, error, children }) {
-  return (
-    <div>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>{label}</div>
-      {children}
-      {error && <div style={{ fontSize: 12, color: C.red, marginTop: 5 }}>{error}</div>}
-    </div>
-  );
-}
-
-function Spinner() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", color: C.muted, gap: 10 }}>
-      <Loader2 size={26} style={{ animation: "spin 1s linear infinite" }} />
-      <span style={{ fontSize: 13 }}>불러오는 중…</span>
+        </div>
+      </div>
     </div>
   );
 }

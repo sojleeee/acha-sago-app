@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { addReport as fbAddReport, updateReport as fbUpdateReport, getReport, deleteReport as fbDeleteReport, getAllReports } from "./firebase";
 import {
-  AlertTriangle, Camera, MapPin, Clock, User,
+  AlertTriangle, Camera, MapPin, Clock, User, Phone,
   X, Loader2, Send, CheckCircle2, ChevronRight,
   Wrench, Clock3, CircleCheck, ClipboardList, Trophy, Search, Award, Medal, Sprout
 } from "lucide-react";
@@ -759,6 +759,7 @@ function ReportForm({ onSubmit }) {
   const [location, setLocation]     = useState("");
   const [dept, setDept]             = useState("");
   const [name, setName]             = useState("");
+  const [phone, setPhone]           = useState("");
   const [desc, setDesc]             = useState("");
   const [photo, setPhoto]           = useState(null);
   const [photoBusy, setPhotoBusy]   = useState(false);
@@ -782,6 +783,7 @@ function ReportForm({ onSubmit }) {
     if (!location.trim())      e.location   = "필수 작성입니다.";
     if (!dept.trim())          e.dept       = "필수 작성입니다.";
     if (!name.trim())          e.name       = "필수 작성입니다.";
+    if (!phone.trim())         e.phone      = "필수 작성입니다.";
     if (!desc.trim())          e.desc       = "필수 작성입니다.";
     if (!photo)                e.photo      = "필수 작성입니다.";
     if (hazard === "etc" && !etcLabel.trim()) e.etcLabel = "필수 작성입니다.";
@@ -796,7 +798,7 @@ function ReportForm({ onSubmit }) {
     saveMyName(name.trim());
     await onSubmit({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      reporterName: name.trim(), dept: dept.trim(),
+      reporterName: name.trim(), phone: phone.trim(), dept: dept.trim(),
       location: location.trim(), occurredAt,
       hazard, hazardLabel: hazard === "etc" ? etcLabel.trim() : null,
       desc: desc.trim(), photo, status: "pending",
@@ -863,14 +865,23 @@ function ReportForm({ onSubmit }) {
         </div>
       </Field>
 
-      {/* 6. 어떤 위험이었나요? */}
-      <Field label="6. 어떤 상황이었나요?" error={errors.desc}>
+      {/* 6. 전화번호 */}
+      <Field label="6. 연락처를 알려주세요" error={errors.phone}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "0 12px" }}>
+          <Phone size={15} color={C.muted} />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="예: 010-1234-5678" inputMode="tel" style={iS} />
+        </div>
+        <p style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>추후 포상 안내 등 필요시 연락드릴 수 있습니다.</p>
+      </Field>
+
+      {/* 7. 어떤 위험이었나요? */}
+      <Field label="7. 어떤 상황이었나요?" error={errors.desc}>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="어떤 점이 위험해 보였는지 알려주세요." rows={4}
           style={{ width: "100%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontSize: 14, padding: "10px 12px", resize: "vertical" }} />
       </Field>
 
-      {/* 7. 사진 첨부 */}
-      <Field label="7. 사진을 보여주세요" error={errors.photo}>
+      {/* 8. 사진 첨부 */}
+      <Field label="8. 사진을 보여주세요" error={errors.photo}>
         {photo ? (
           <div style={{ position: "relative", width: 120 }}>
             <img src={photo} alt="첨부" style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />

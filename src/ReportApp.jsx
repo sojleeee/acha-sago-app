@@ -331,11 +331,16 @@ function MyRank() {
 
   const map = {};
   named.forEach((r) => {
-    if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0 };
+    if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0, score: 0 };
     map[r.reporterName].total += 1;
-    if (r.status === "done") map[r.reporterName].done += 1;
+    if (r.status === "done") {
+      map[r.reporterName].done += 1;
+      map[r.reporterName].score += 3;
+    } else {
+      map[r.reporterName].score += 1;
+    }
   });
-  const ranked = Object.values(map).sort((a, b) => b.total - a.total || b.done - a.done);
+  const ranked = Object.values(map).sort((a, b) => b.score - a.score || b.done - a.done);
 
   const rankEmoji = (i) => `${i + 1}`;
 
@@ -367,10 +372,11 @@ function MyRank() {
       {/* 테이블 헤더 */}
       <div style={{ display: "flex", alignItems: "center", padding: "8px 14px", marginBottom: 6, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ width: 36, fontSize: 11.5, fontWeight: 700, color: C.muted }}>순위</span>
-        <span style={{ width: 76, fontSize: 11.5, fontWeight: 700, color: C.muted, flexShrink: 0 }}>소속</span>
+        <span style={{ width: 60, fontSize: 11.5, fontWeight: 700, color: C.muted, flexShrink: 0 }}>소속</span>
         <span style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: C.muted }}>이름</span>
-        <span style={{ width: 56, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>발견</span>
-        <span style={{ width: 56, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>조치완료</span>
+        <span style={{ width: 42, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>발견</span>
+        <span style={{ width: 42, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>완료</span>
+        <span style={{ width: 42, fontSize: 11.5, fontWeight: 700, color: C.muted, textAlign: "center" }}>점수</span>
       </div>
 
       {/* 테이블 행 */}
@@ -383,10 +389,11 @@ function MyRank() {
             border: `1px solid ${C.line}`,
           }}>
             <span className="mono" style={{ width: 36, fontSize: 13, fontWeight: 700, color: C.muted }}>{rankEmoji(i)}</span>
-            <span style={{ width: 76, fontSize: 12, color: C.muted, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.dept}</span>
+            <span style={{ width: 60, fontSize: 12, color: C.muted, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.dept}</span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.text }}>{p.name}</span>
-            <span className="mono" style={{ width: 56, fontSize: 15, fontWeight: 700, color: C.yellow, textAlign: "center" }}>{p.total - p.done}</span>
-            <span className="mono" style={{ width: 56, fontSize: 15, fontWeight: 700, color: C.green, textAlign: "center" }}>{p.done}</span>
+            <span className="mono" style={{ width: 42, fontSize: 13, fontWeight: 700, color: C.yellow, textAlign: "center" }}>{p.total - p.done}</span>
+            <span className="mono" style={{ width: 42, fontSize: 13, fontWeight: 700, color: C.green, textAlign: "center" }}>{p.done}</span>
+            <span className="mono" style={{ width: 42, fontSize: 15, fontWeight: 700, color: C.blue, textAlign: "center" }}>{p.score}</span>
           </div>
         ))}
       </div>

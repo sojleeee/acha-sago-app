@@ -657,16 +657,19 @@ function Chip({ active, onClick, label, color }) {
 function Ranking({ reports }) {
   const named = reports.filter((r) => r.reporterName);
 
-  // 신고자별 집계 — 신고만 한 건 1점, "본인이 직접" 조치완료까지 한 건 3점.
-  // 즉시조치불가로 담당 부서에 넘긴 건은, 나중에 부서가 완료 처리해도
-  // 신고자 본인이 한 게 아니므로 1점(신고만)으로 고정한다.
+  // 신고자별 집계 — 알림처럼 "확정된 최종 상태"에만 점수를 준다.
+  // pending(제출만)/action(진행중)은 아직 확정이 아니라서 0점.
+  // deferred(즉시조치불가로 확정)는 1점. done은 본인이 직접 했으면 3점,
+  // 부서가 대신 완료했으면(assignedDept 있음) 1점.
   const map = {};
   named.forEach((r) => {
     if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0, score: 0 };
     map[r.reporterName].total += 1;
-    const selfCompleted = r.status === "done" && !r.assignedDept;
     if (r.status === "done") map[r.reporterName].done += 1;
-    map[r.reporterName].score += selfCompleted ? 3 : 1;
+    let pts = 0;
+    if (r.status === "done") pts = r.assignedDept ? 1 : 3;
+    else if (r.status === "deferred") pts = 1;
+    map[r.reporterName].score += pts;
   });
   const ranked = Object.values(map).sort((a, b) => b.score - a.score || b.done - a.done);
 

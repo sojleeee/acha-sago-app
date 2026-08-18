@@ -3,7 +3,7 @@ import { subscribeReports, updateReport as fbUpdateReport, deleteReport as fbDel
 import * as XLSX from "xlsx";
 import {
   ClipboardList, Trophy, Camera, MapPin, User, Phone,
-  Trash2, X, Loader2, Award, Medal, Sprout, ImageOff,
+  Trash2, X, Loader2, Award, Medal, Sprout, ImageOff, CircleCheck,
   ShieldCheck, RefreshCw, KeyRound, Lock, Search, Download, Calendar, SlidersHorizontal, ChevronRight
 } from "lucide-react";
 
@@ -261,7 +261,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
 
   const selectedReport = selectedId ? reports.find((r) => r.id === selectedId) : null;
   if (selectedReport) {
-    return <ReportDetailPage report={selectedReport} onBack={() => setSelectedId(null)} onDelete={onDelete} />;
+    return <ReportDetailPage report={selectedReport} onBack={() => setSelectedId(null)} onDelete={onDelete} onUpdate={onUpdate} />;
   }
 
   return (
@@ -367,11 +367,43 @@ function ReportList({ reports, onDelete, onUpdate }) {
 }
 
 /* ── 신고 상세 페이지 ── */
-function ReportDetailPage({ report, onBack, onDelete }) {
+function ReportDetailPage({ report, onBack, onDelete, onUpdate }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [photoView, setPhotoView]   = useState(null);
+  const [completing, setCompleting] = useState(false); // "조치 완료 등록" 폼 열림 여부
+  const [actionDesc, setActionDesc] = useState("");
+  const [actionPhoto, setActionPhoto] = useState(null);
+  const [photoBusy, setPhotoBusy]   = useState(false);
+  const [completeErrors, setCompleteErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const h  = hazardOf(report.hazard);
   const st = STATUS_META[report.status] || STATUS_META.pending;
+
+  const handleActionPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoBusy(true);
+    try   { setActionPhoto(await compressImage(file)); setCompleteErrors((p) => ({ ...p, photo: undefined })); }
+    catch { setCompleteErrors((p) => ({ ...p, photo: "사진 처리에 실패했어요." })); }
+    finally { setPhotoBusy(false); }
+  };
+
+  const submitCompletion = async () => {
+    const errs = {};
+    if (!actionDesc.trim()) errs.desc = "조치 내용을 입력해주세요.";
+    if (!actionPhoto) errs.photo = "조치 사진을 첨부해주세요.";
+    setCompleteErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setSubmitting(true);
+    await onUpdate(report.id, {
+      status: "done",
+      actionDesc: actionDesc.trim(),
+      actionPhoto,
+      actionAt: new Date().toISOString(),
+    });
+    setSubmitting(false);
+    setCompleting(false);
+  };
 
   return (
     <div style={{ animation: "fadein .2s ease" }}>
@@ -423,6 +455,53 @@ function ReportDetailPage({ report, onBack, onDelete }) {
         </div>
       )}
 
+      {/* 즉시 조치 불가 신고를, 배정된 부서가 직접 조치 완료 등록 */}
+      {report.status === "deferred" && !completing && (
+        <button onClick={() => setCompleting(true)} className="osw" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.green, color: C.bg, border: "none", borderRadius: 12, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 14 }}>
+          <CircleCheck size={17} /> 조치 완료 등록
+        </button>
+      )}
+
+      {report.status === "deferred" && completing && (
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          <div className="osw" style={{ fontSize: 14.5, fontWeight: 700, color: C.text, marginBottom: 12 }}>조치 완료 내용 입력</div>
+
+          <label style={{ display: "block", fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 내용</label>
+          <textarea
+            value={actionDesc}
+            onChange={(e) => { setActionDesc(e.target.value); setCompleteErrors((p) => ({ ...p, desc: undefined })); }}
+            placeholder="어떻게 조치했는지 알려주세요."
+            rows={4}
+            style={{ width: "100%", background: C.surfaceAlt, border: `1.5px solid ${completeErrors.desc ? C.red : C.line}`, borderRadius: 10, color: C.text, fontSize: 13.5, padding: "10px 12px", resize: "vertical", marginBottom: completeErrors.desc ? 4 : 12 }}
+          />
+          {completeErrors.desc && <div style={{ fontSize: 11.5, color: C.red, marginBottom: 12 }}>{completeErrors.desc}</div>}
+
+          <label style={{ display: "block", fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 6 }}>조치 사진</label>
+          {actionPhoto ? (
+            <div style={{ position: "relative", marginBottom: completeErrors.photo ? 4 : 14 }}>
+              <img src={actionPhoto} alt="조치 사진" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
+              <button onClick={() => setActionPhoto(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                <X size={14} color="#fff" />
+              </button>
+            </div>
+          ) : (
+            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, background: C.surfaceAlt, border: `1.5px dashed ${completeErrors.photo ? C.red : C.line}`, borderRadius: 10, padding: "24px 0", cursor: "pointer", marginBottom: completeErrors.photo ? 4 : 14 }}>
+              <Camera size={22} color={C.muted} />
+              <span style={{ fontSize: 12, color: C.muted }}>{photoBusy ? "처리 중…" : "사진 선택"}</span>
+              <input type="file" accept="image/*" onChange={handleActionPhoto} style={{ display: "none" }} disabled={photoBusy} />
+            </label>
+          )}
+          {completeErrors.photo && <div style={{ fontSize: 11.5, color: C.red, marginBottom: 14 }}>{completeErrors.photo}</div>}
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => setCompleting(false)} disabled={submitting} style={{ flex: 1, padding: "12px 0", background: "transparent", border: `1.5px solid ${C.line}`, borderRadius: 12, color: C.muted, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>취소</button>
+            <button onClick={submitCompletion} disabled={submitting || photoBusy} className="osw" style={{ flex: 2, padding: "12px 0", background: C.green, border: "none", borderRadius: 12, color: C.bg, cursor: "pointer", fontSize: 14, fontWeight: 700, opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? "등록 중…" : "완료 등록"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {!confirmDel ? (
         <button onClick={() => setConfirmDel(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "transparent", border: `1.5px solid ${C.red}`, borderRadius: 12, padding: "12px 0", color: C.red, cursor: "pointer", fontSize: 13.5, fontWeight: 600 }}>
           <Trash2 size={14} /> 삭제하기
@@ -459,6 +538,28 @@ function DetailRow({ icon: Icon, label, value }) {
       </div>
     </div>
   );
+}
+
+// 배정 부서가 "즉시 조치 불가" 신고를 조치 완료 처리할 때 사진을 압축해서 저장
+function compressImage(file, maxW = 900, quality = 0.62) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width  = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => reject(new Error("이미지 로드 실패"));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error("파일 읽기 실패"));
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ════════════════════════════ 휴지통 ════════════════════════════ */

@@ -216,6 +216,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
   if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "action");
   if (statusFilter === "deferred") filtered = filtered.filter((r) => r.status === "deferred");
   if (statusFilter === "done") filtered = filtered.filter((r) => r.status === "done");
+  if (statusFilter === "deptDone") filtered = filtered.filter((r) => r.status === "done" && r.assignedDept);
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
   if (searchQuery.trim()) {
     const q = searchQuery.trim().toLowerCase();
@@ -234,6 +235,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
   const progressCount = reports.filter((r) => r.status === "action").length;
   const deferredCount = reports.filter((r) => r.status === "deferred").length;
   const doneCount     = reports.filter((r) => r.status === "done").length;
+  const deptDoneCount = reports.filter((r) => r.status === "done" && r.assignedDept).length;
 
   const handleExport = () => {
     const rows = sorted.map((r) => ({
@@ -267,11 +269,12 @@ function ReportList({ reports, onDelete, onUpdate }) {
   return (
     <div style={{ animation: "fadein .3s ease" }}>
       {/* 요약 배지 (클릭하면 필터로 동작) */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }}>
         <StatBadge label="전체" value={reports.length} color={C.blue} active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
         <StatBadge label="조치진행중" value={progressCount} color={C.orange} active={statusFilter === "progress"} onClick={() => setStatusFilter("progress")} />
         <StatBadge label="즉시조치불가" value={deferredCount} color={C.red} active={statusFilter === "deferred"} onClick={() => setStatusFilter("deferred")} />
         <StatBadge label="조치완료" value={doneCount} color={C.green} active={statusFilter === "done"} onClick={() => setStatusFilter("done")} />
+        <StatBadge label="부서조치완료" value={deptDoneCount} color={C.blue} active={statusFilter === "deptDone"} onClick={() => setStatusFilter("deptDone")} />
       </div>
 
       {/* 검색 + 필터 토글 + 내보내기 */}
@@ -632,8 +635,8 @@ function StatBadge({ label, value, color, active, onClick }) {
     <button
       onClick={onClick}
       style={{
-        flex: 1, background: active ? `${color}22` : C.surface, borderRadius: 9, padding: "8px 3px",
-        textAlign: "center", border: `1.5px solid ${active ? color : C.line}`, cursor: "pointer", minWidth: 0,
+        flex: "1 0 68px", background: active ? `${color}22` : C.surface, borderRadius: 9, padding: "8px 3px",
+        textAlign: "center", border: `1.5px solid ${active ? color : C.line}`, cursor: "pointer", minWidth: 68,
       }}
     >
       <div className="mono" style={{ fontSize: 16, fontWeight: 700, color }}>{value}</div>

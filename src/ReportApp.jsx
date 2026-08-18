@@ -331,13 +331,14 @@ function MyRank() {
 
   const map = {};
   named.forEach((r) => {
-    if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0, score: 0 };
-    map[r.reporterName].total += 1;
-    if (r.status === "done") map[r.reporterName].done += 1;
+    const key = `${r.reporterName}__${r.phone || ""}`;
+    if (!map[key]) map[key] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0, score: 0 };
+    map[key].total += 1;
+    if (r.status === "done") map[key].done += 1;
     let pts = 0;
     if (r.status === "done") pts = r.assignedDept ? 1 : 3;
     else if (r.status === "deferred") pts = 1;
-    map[r.reporterName].score += pts;
+    map[key].score += pts;
   });
   const ranked = Object.values(map).sort((a, b) => b.score - a.score || b.done - a.done);
 
@@ -381,7 +382,7 @@ function MyRank() {
       {/* 테이블 행 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {ranked.map((p, i) => (
-          <div key={p.name} style={{
+          <div key={i} style={{
             display: "flex", alignItems: "center", padding: "12px 14px",
             background: C.surface,
             borderRadius: 10,

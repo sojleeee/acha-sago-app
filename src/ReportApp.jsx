@@ -333,12 +333,9 @@ function MyRank() {
   named.forEach((r) => {
     if (!map[r.reporterName]) map[r.reporterName] = { name: r.reporterName, dept: r.dept || "-", total: 0, done: 0, score: 0 };
     map[r.reporterName].total += 1;
-    if (r.status === "done") {
-      map[r.reporterName].done += 1;
-      map[r.reporterName].score += 3;
-    } else {
-      map[r.reporterName].score += 1;
-    }
+    const selfCompleted = r.status === "done" && !r.assignedDept;
+    if (r.status === "done") map[r.reporterName].done += 1;
+    map[r.reporterName].score += selfCompleted ? 3 : 1;
   });
   const ranked = Object.values(map).sort((a, b) => b.score - a.score || b.done - a.done);
 

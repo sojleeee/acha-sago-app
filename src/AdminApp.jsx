@@ -443,7 +443,12 @@ function ReportDetailPage({ report, onBack, onDelete, onUpdate }) {
 
       {report.status === "done" && report.actionDesc && (
         <div style={{ background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, color: C.green, fontWeight: 700, marginBottom: 8 }}>✓ 조치 완료 내용</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 12.5, color: C.green, fontWeight: 700 }}>✓ 조치 완료 내용</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: C.green, background: `${C.green}22`, padding: "2px 8px", borderRadius: 20 }}>
+              {report.assignedDept ? `부서 조치 (${report.assignedDept})` : "본인 조치"}
+            </span>
+          </div>
           <p style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6, marginBottom: report.actionAt || report.actionPhoto ? 10 : 0 }}>{report.actionDesc}</p>
           {report.actionAt && <div className="mono" style={{ fontSize: 11.5, color: C.muted, marginBottom: report.actionPhoto ? 10 : 0 }}>{fmtDateTime(report.actionAt)}</div>}
           {report.actionPhoto && (

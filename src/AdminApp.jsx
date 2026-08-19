@@ -215,7 +215,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
   let filtered = reports;
   if (statusFilter === "progress") filtered = filtered.filter((r) => r.status === "action");
   if (statusFilter === "deferred") filtered = filtered.filter((r) => r.status === "deferred");
-  if (statusFilter === "done") filtered = filtered.filter((r) => r.status === "done");
+  if (statusFilter === "done") filtered = filtered.filter((r) => r.status === "done" && !r.assignedDept);
   if (statusFilter === "deptDone") filtered = filtered.filter((r) => r.status === "done" && r.assignedDept);
   if (hazardFilter !== "all") filtered = filtered.filter((r) => r.hazard === hazardFilter);
   if (searchQuery.trim()) {
@@ -234,7 +234,7 @@ function ReportList({ reports, onDelete, onUpdate }) {
 
   const progressCount = reports.filter((r) => r.status === "action").length;
   const deferredCount = reports.filter((r) => r.status === "deferred").length;
-  const doneCount     = reports.filter((r) => r.status === "done").length;
+  const doneCount     = reports.filter((r) => r.status === "done" && !r.assignedDept).length;
   const deptDoneCount = reports.filter((r) => r.status === "done" && r.assignedDept).length;
 
   const handleExport = () => {

@@ -773,6 +773,7 @@ function ReportForm({ onSubmit }) {
   const [errors, setErrors]         = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [consent, setConsent]       = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
   const fileRef = useRef(null);
 
   const handlePhoto = async (e) => {
@@ -905,17 +906,49 @@ function ReportForm({ onSubmit }) {
         <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
       </Field>
 
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, background: C.surfaceAlt, border: `1px solid ${errors.consent ? C.red : C.line}`, borderRadius: 10, padding: "10px 12px", cursor: "pointer" }}>
-        <input
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: undefined })); }}
-          style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16, accentColor: C.blue, cursor: "pointer" }}
-        />
-        <span style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-          [개인정보 수집·이용 동의 문구 자리 — 추후 작성 예정]
-        </span>
-      </label>
+      <div style={{ background: C.surfaceAlt, border: `1px solid ${errors.consent ? C.red : C.line}`, borderRadius: 10, padding: "12px" }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: undefined })); }}
+            style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16, accentColor: C.blue, cursor: "pointer" }}
+          />
+          <span style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, fontWeight: 600 }}>
+            [필수] 개인정보 수집·이용에 동의합니다.
+          </span>
+        </label>
+        <button
+          type="button"
+          onClick={() => setConsentOpen((v) => !v)}
+          style={{ background: "transparent", border: "none", color: C.blue, fontSize: 11.5, textDecoration: "underline", cursor: "pointer", padding: "6px 0 0 24px" }}
+        >
+          {consentOpen ? "내용 접기 ▲" : "전체 내용 보기 ▼"}
+        </button>
+        {consentOpen && (
+          <div style={{ marginTop: 8, marginLeft: 24, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 8, padding: 12, fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}>
+            <p style={{ margin: "0 0 8px", fontWeight: 700, color: C.text }}>&lt;아차사고 발굴앱을 위한 개인정보 수집·이용 동의서&gt;</p>
+            <p style={{ margin: "0 0 10px" }}>수도권매립지관리공사는 아래와 같이 개인정보를 수집·이용하고자 합니다. 내용을 자세히 확인하신 후 동의 여부를 결정해 주시기 바랍니다. 수집된 개인정보는 안전하게 보관되며, 수집 목적 내에서만 이용됩니다.</p>
+            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+              <thead>
+                <tr>
+                  <th style={{ border: `1px solid ${C.line}`, padding: 6, fontWeight: 700, color: C.text, textAlign: "left" }}>개인정보 항목</th>
+                  <th style={{ border: `1px solid ${C.line}`, padding: 6, fontWeight: 700, color: C.text, textAlign: "left" }}>수집·이용 목적</th>
+                  <th style={{ border: `1px solid ${C.line}`, padding: 6, fontWeight: 700, color: C.text, textAlign: "left" }}>보유·이용 기간</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ border: `1px solid ${C.line}`, padding: 6 }}>이름, 휴대폰 번호, 소속, 사진</td>
+                  <td style={{ border: `1px solid ${C.line}`, padding: 6 }}>위험요인 신고 접수 및 개선 조치 처리, 담당 부서 배정 및 조치 결과 확인, 우수 참여자 포상 심사</td>
+                  <td style={{ border: `1px solid ${C.line}`, padding: 6 }}>목적 달성 후 즉시 파기</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style={{ margin: 0 }}>※ 위의 개인정보 수집·이용에 대한 동의를 거부할 권리가 있습니다. 다만 동의를 거부하실 경우 서비스 이용이 제한될 수 있습니다.</p>
+          </div>
+        )}
+      </div>
       {errors.consent && <span style={{ fontSize: 11.5, color: C.red, marginTop: -10 }}>{errors.consent}</span>}
 
       <button onClick={handleSubmit} disabled={submitting || photoBusy} className="osw"

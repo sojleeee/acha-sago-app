@@ -238,22 +238,29 @@ function ReportList({ reports, onDelete, onUpdate }) {
   const deptDoneCount = reports.filter((r) => r.status === "done" && r.assignedDept).length;
 
   const handleExport = () => {
-    const rows = sorted.map((r) => ({
-      "위험유형": hazardLabel(r),
-      "발생일시": fmtDateTime(r.occurredAt),
-      "발생장소": r.location || "",
-      "소속": r.dept || "",
-      "이름": r.isAnonymous ? "익명" : (r.reporterName || ""),
-      "연락처": r.isAnonymous ? "익명" : (r.phone || ""),
-      "상황설명": r.desc || "",
-      "상태": (STATUS_META[r.status] || STATUS_META.pending).label,
-      "조치내용": r.actionDesc || "",
-      "조치일시": r.actionAt ? fmtDateTime(r.actionAt) : "",
-    }));
+    const rows = sorted.map((r) => {
+      let score = 0;
+      if (r.status === "done") score = r.assignedDept ? 1 : 3;
+      else if (r.status === "deferred") score = 1;
+      return {
+        "위험유형": hazardLabel(r),
+        "발생일시": fmtDateTime(r.occurredAt),
+        "발생장소": r.location || "",
+        "소속": r.dept || "",
+        "이름": r.isAnonymous ? "익명" : (r.reporterName || ""),
+        "연락처": r.isAnonymous ? "익명" : (r.phone || ""),
+        "상황설명": r.desc || "",
+        "상태": (STATUS_META[r.status] || STATUS_META.pending).label,
+        "처리방식": r.assignedDept ? `부서 요청(${r.assignedDept})` : (r.status === "done" ? "본인 직접 조치" : "-"),
+        "점수": score,
+        "조치내용": r.actionDesc || "",
+        "조치일시": r.actionAt ? fmtDateTime(r.actionAt) : "",
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
       { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
-      { wch: 30 }, { wch: 12 }, { wch: 30 }, { wch: 18 },
+      { wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 8 }, { wch: 30 }, { wch: 18 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "발견현황");
